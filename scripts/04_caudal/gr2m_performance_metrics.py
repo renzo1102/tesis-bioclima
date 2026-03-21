@@ -2,17 +2,20 @@
 Script: gr2m_performance_metrics.py
 
 Descripción:
-Evalúa desempeño del modelo
+Evalúa desempeño del modelo mediante diagnóstico de rezago hidrológico
+entre precipitación y caudal observado.
 
 Entradas:
-Q simulado
+Series mensuales simuladas y observadas del modelo hidrológico
 
 Salidas:
-NSE, RMSE, etc.
+Correlaciones lluvia–caudal con distintos rezagos temporales
+y tabla resumen del rezago dominante.
 
 Autor: Renzo Mendoza
 Año: 2026
 """
+
 # ==========================================================
 # SCRIPT 13
 # FASE 7C
@@ -29,10 +32,15 @@ print("====================================")
 # ----------------------------------------------------------
 # RUTAS
 # ----------------------------------------------------------
+# Se define el directorio base del proyecto para permitir
+# ejecución reproducible del análisis hidrológico.
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
+# Carpeta donde se encuentran resultados del modelo hidrológico
 DATA_MODEL = BASE_DIR / "data_model"
+
+# Carpeta donde se guardarán tablas diagnósticas
 OUTPUT_TABLAS = BASE_DIR / "outputs" / "tablas"
 
 OUTPUT_TABLAS.mkdir(parents=True, exist_ok=True)
@@ -40,18 +48,21 @@ OUTPUT_TABLAS.mkdir(parents=True, exist_ok=True)
 # ----------------------------------------------------------
 # UNIDADES HIDROLÓGICAS
 # ----------------------------------------------------------
+# Lista de microcuencas o unidades hidrológicas analizadas.
 
 UH_LIST = ["Matoc", "Pocco"]
 
 # ----------------------------------------------------------
 # RESULTADOS
 # ----------------------------------------------------------
+# Lista donde se almacenarán resultados del análisis de rezago.
 
 resultados = []
 
 # ----------------------------------------------------------
 # PROCESAMIENTO
 # ----------------------------------------------------------
+# Se realiza análisis independiente para cada unidad hidrológica.
 
 for uh in UH_LIST:
 
@@ -61,31 +72,53 @@ for uh in UH_LIST:
 
     archivo = DATA_MODEL / f"modelo_{uh}.csv"
 
+    # control de existencia del archivo
     if not archivo.exists():
         print("⚠ Archivo no encontrado:", archivo)
         continue
 
-    df = pd.read_csv(archivo, parse_dates=["fecha"])
+    # lectura de datos mensuales del modelo
+    df = pd.read_csv(
+        archivo,
+        parse_dates=["fecha"]
+    )
 
-    # asegurar numéricos
-    df["P_mm"] = pd.to_numeric(df["P_mm"], errors="coerce")
-    df["Q_mm"] = pd.to_numeric(df["Q_mm"], errors="coerce")
+    # asegurar variables numéricas hidrológicas
+    df["P_mm"] = pd.to_numeric(
+        df["P_mm"],
+        errors="coerce"
+    )
+
+    df["Q_mm"] = pd.to_numeric(
+        df["Q_mm"],
+        errors="coerce"
+    )
 
     # ------------------------------------------------------
     # CREAR REZAGOS
     # ------------------------------------------------------
+    # Se generan variables de precipitación desplazadas en el
+    # tiempo para evaluar respuesta retardada del caudal.
+    #
+    # Interpretación hidrológica:
+    # P_t  → lluvia del mismo mes
+    # P_t1 → lluvia 1 mes antes
+    # P_t2 → lluvia 2 meses antes
+    # P_t3 → lluvia 3 meses antes
 
     df["P_t"]  = df["P_mm"]
     df["P_t1"] = df["P_mm"].shift(1)
     df["P_t2"] = df["P_mm"].shift(2)
     df["P_t3"] = df["P_mm"].shift(3)
 
-    # eliminar filas sin Q
+    # eliminar meses sin caudal válido
     df_valid = df.dropna(subset=["Q_mm"])
 
     # ------------------------------------------------------
     # CORRELACIONES
     # ------------------------------------------------------
+    # Se calcula correlación de Pearson entre caudal mensual
+    # y precipitación con distintos rezagos.
 
     corr_t  = df_valid[["P_t","Q_mm"]].dropna().corr().iloc[0,1]
     corr_t1 = df_valid[["P_t1","Q_mm"]].dropna().corr().iloc[0,1]
@@ -100,6 +133,12 @@ for uh in UH_LIST:
     # ------------------------------------------------------
     # MEJOR REZAGO
     # ------------------------------------------------------
+    # Se identifica el rezago con mayor correlación positiva.
+    #
+    # Esto permite inferir:
+    # ✔ tiempo de respuesta de la cuenca
+    # ✔ almacenamiento subsuperficial
+    # ✔ persistencia hidrológica mensual
 
     correlaciones = {
         "P_t": corr_t,
@@ -108,7 +147,10 @@ for uh in UH_LIST:
         "P_t3": corr_t3
     }
 
-    mejor = max(correlaciones, key=correlaciones.get)
+    mejor = max(
+        correlaciones,
+        key=correlaciones.get
+    )
 
     print("Mejor rezago:", mejor)
 
@@ -128,12 +170,16 @@ for uh in UH_LIST:
 # ----------------------------------------------------------
 # TABLA RESULTADOS
 # ----------------------------------------------------------
+# Se construye tabla comparativa final entre unidades hidrológicas.
 
 tabla = pd.DataFrame(resultados)
 
 salida = OUTPUT_TABLAS / "tabla_rezago_hidrologico.csv"
 
-tabla.to_csv(salida, index=False)
+tabla.to_csv(
+    salida,
+    index=False
+)
 
 print("\n====================================")
 print("TABLA DE REZAGO GUARDADA")
