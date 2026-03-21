@@ -1,40 +1,51 @@
 """
 Script: chirps_validation.py
 
-Descripción:
-Valida CHIRPS vs estaciones
+Descripción general
+-------------------
+Este script evalúa el desempeño del producto satelital de precipitación
+CHIRPS mediante comparación con observaciones pluviométricas.
 
-Entradas:
-CHIRPS, estaciones
+La validación se realiza en dos niveles espaciales:
+1) Estaciones meteorológicas (ANA 1 y ANA 2)
+2) Promedios espaciales en unidades hidrográficas (Matoc y Pocco)
 
-Salidas:
-Métricas
+Se calculan métricas estadísticas comúnmente utilizadas en estudios
+hidrológicos para evaluar productos satelitales.
 
-Autor: Renzo Mendoza
+Entradas
+--------
+- Series mensuales de precipitación observada
+- Series mensuales CHIRPS
+
+Salidas
+-------
+- Tabla de métricas de desempeño por estación y unidad hidrográfica
+
+Autor: Renzo Mendoza  
 Año: 2026
 """
-# ============================================================
-# SCRIPT 8
-# FASE 5 — VALIDACIÓN INTEGRAL CHIRPS (AJUSTADA A RESULTADOS)
-# ============================================================
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
+
 # ============================================================
-# RUTAS
+# CONFIGURACIÓN DE RUTAS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 INPUT_OBS = BASE_DIR / "outputs/mensuales"
 INPUT_CHIRPS = BASE_DIR / "outputs/chirps"
-OUTPUT_DIR = BASE_DIR / "outputs/validacion_chirps"
 
+OUTPUT_DIR = BASE_DIR / "outputs/validacion_chirps"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
 # ============================================================
-# CARGAR OBSERVADOS
+# CARGA DE SERIES OBSERVADAS
 # ============================================================
 
 matoc_obs = pd.read_csv(
@@ -52,36 +63,86 @@ estaciones = pd.read_csv(
     parse_dates=["fecha_mensual"]
 )
 
-ana1_obs = estaciones[estaciones["Estacion"] == "ANA 1"][
-    ["fecha_mensual", "Prec_mensual"]
-].rename(columns={"Prec_mensual": "ANA1_OBS"})
+"""
+Se cargan tres tipos de series observadas:
 
-ana2_obs = estaciones[estaciones["Estacion"] == "ANA 2"][
-    ["fecha_mensual", "Prec_mensual"]
-].rename(columns={"Prec_mensual": "ANA2_OBS"})
+- precipitación promedio en UH Matoc
+- precipitación promedio en UH Pocco
+- estaciones individuales
+"""
+
+ana1_obs = estaciones[
+    estaciones["Estacion"] == "ANA 1"
+][["fecha_mensual", "Prec_mensual"]].rename(
+    columns={"Prec_mensual": "ANA1_OBS"}
+)
+
+ana2_obs = estaciones[
+    estaciones["Estacion"] == "ANA 2"
+][["fecha_mensual", "Prec_mensual"]].rename(
+    columns={"Prec_mensual": "ANA2_OBS"}
+)
+
 
 # ============================================================
-# CARGAR CHIRPS
+# FUNCIÓN: CARGAR SERIE CHIRPS
 # ============================================================
 
 def cargar_chirps(nombre_archivo, nueva_col):
+    """
+    Carga una serie temporal CHIRPS y la prepara para análisis.
+
+    Parámetros
+    ----------
+    nombre_archivo : str
+        Archivo CSV exportado desde GEE.
+
+    nueva_col : str
+        Nombre que tomará la variable CHIRPS.
+
+    Retorna
+    -------
+    DataFrame con fecha mensual y precipitación.
+    """
+
     df = pd.read_csv(INPUT_CHIRPS / nombre_archivo)
+
     df["fecha_mensual"] = pd.to_datetime(df["date"] + "-01")
+
     df = df.rename(columns={"CHIRPS": nueva_col})
+
     return df[["fecha_mensual", nueva_col]]
+
 
 matoc_ch = cargar_chirps("CHIRPS_MATOC_2012_2022.csv", "CHIRPS_MATOC")
 pocco_ch = cargar_chirps("CHIRPS_POCCO_2012_2022.csv", "CHIRPS_POCCO")
+
 ana1_ch = cargar_chirps("CHIRPS_ANA1_2012_2022.csv", "CHIRPS_ANA1")
 ana2_ch = cargar_chirps("CHIRPS_ANA2_2012_2022.csv", "CHIRPS_ANA2")
 
+
 # ============================================================
-# FUNCIÓN MÉTRICAS
+# FUNCIÓN: MÉTRICAS DE VALIDACIÓN
 # ============================================================
 
 def calcular_metricas(obs, pred):
+    """
+    Calcula métricas estadísticas entre serie observada y estimada.
+
+    Métricas utilizadas:
+    - R: correlación de Pearson
+    - R2: coeficiente de determinación
+    - RMSE: error cuadrático medio
+    - Bias: error medio
+    - NSE: Nash-Sutcliffe Efficiency
+
+    Retorna
+    -------
+    Diccionario con métricas de desempeño.
+    """
 
     mask = (~obs.isna()) & (~pred.isna())
+
     obs = obs[mask]
     pred = pred[mask]
 
@@ -90,7 +151,9 @@ def calcular_metricas(obs, pred):
 
     r = np.corrcoef(obs, pred)[0, 1]
     r2 = r ** 2
+
     rmse = np.sqrt(np.mean((obs - pred) ** 2))
+
     bias = pred.mean() - obs.mean()
     bias_pct = (bias / obs.mean()) * 100
 
@@ -109,8 +172,9 @@ def calcular_metricas(obs, pred):
         "n_meses": len(obs)
     }
 
+
 # ============================================================
-# VALIDACIONES
+# VALIDACIÓN POR SERIES
 # ============================================================
 
 resultados = []
@@ -118,26 +182,38 @@ resultados = []
 # ANA 1
 df = ana1_obs.merge(ana1_ch, on="fecha_mensual", how="inner")
 met = calcular_metricas(df["ANA1_OBS"], df["CHIRPS_ANA1"])
+
 if met:
     resultados.append({"Serie": "ANA 1", **met})
+
 
 # ANA 2
 df = ana2_obs.merge(ana2_ch, on="fecha_mensual", how="inner")
 met = calcular_metricas(df["ANA2_OBS"], df["CHIRPS_ANA2"])
+
 if met:
     resultados.append({"Serie": "ANA 2", **met})
 
-# Matoc
+
+# Matoc UH
 df = matoc_obs.merge(matoc_ch, on="fecha_mensual", how="inner")
 met = calcular_metricas(df["Prec_UH_OBS"], df["CHIRPS_MATOC"])
+
 if met:
     resultados.append({"Serie": "Matoc_UH", **met})
 
-# Pocco
+
+# Pocco UH
 df = pocco_obs.merge(pocco_ch, on="fecha_mensual", how="inner")
 met = calcular_metricas(df["Prec_UH_OBS"], df["CHIRPS_POCCO"])
+
 if met:
     resultados.append({"Serie": "Pocco_UH", **met})
+
+
+# ============================================================
+# EXPORTAR RESULTADOS
+# ============================================================
 
 resumen = pd.DataFrame(resultados)
 
@@ -146,6 +222,6 @@ resumen.to_csv(
     index=False
 )
 
-print("\nRESULTADOS FASE 5 — VALIDACIÓN INTEGRAL CHIRPS")
+print("Resultados de validación CHIRPS")
 print(resumen)
-print("\nFASE 5 COMPLETADA.")
+print("Fase 5 completada correctamente")
