@@ -4,18 +4,17 @@ Análisis bioclimático de NDVI, temperatura, precipitación y caudal
 
 ---
 
-# Influencia de los parámetros bioclimáticos en el caudal de las microcuencas Matoc y Pocco (2012–2022)
+# INFLUENCIA DE LOS PARÁMETROS BIOCLIMÁTICOS EN EL CAUDAL DE LAS UNIDADES HIDROGRÁFICAS MATOC Y POCCO, RECUAY, 2012 – 2022
 
 ## Descripción
 
-Este repositorio contiene el conjunto completo de scripts desarrollados para el procesamiento, análisis y modelamiento de variables bioclimáticas en las microcuencas Matoc y Pocco, incluyendo:
+Este repositorio contiene el conjunto completo de scripts desarrollados para el procesamiento y análisis de variables bioclimáticas en las UU.HH. Matoc y Pocco, incluyendo:
 
 - Índice de Vegetación de Diferencia Normalizada (NDVI)
 - Temperatura (MERRA-2)
-- Precipitación (estaciones y CHIRPS)
-- Caudal (datos observados)
-- Modelado hidrológico (GR2M)
-- Análisis estadístico multivariable (correlaciones y tendencias)
+- Precipitación (estaciones ANA y CHIRPS)
+- Caudal (datos observados y GR2M)
+- Análisis estadístico (correlaciones y tendencias)
 
 El objetivo es evaluar la influencia de los parámetros bioclimáticos en el comportamiento del caudal mediante un enfoque reproducible basado en datos satelitales, observacionales y modelamiento hidrometeorológico.
 
@@ -39,9 +38,7 @@ tesis-bioclima/
 │   ├── 02_temperatura/
 │   ├── 03_precipitacion/
 │   ├── 04_caudal/
-│   ├── 05_modelo_gr2m/
-│   ├── 06_analisis_caudal/
-│   └── 07_analisis_integrado/
+│   └── 05_analisis_integrado/
 │
 ├── outputs/
 │   ├── csv/
@@ -102,8 +99,6 @@ pip install -r requirements.txt
 - streamflow_uh_series.py  
 - streamflow_gap_analysis.py  
 - streamflow_data_completion.py  
-
-### 5. Modelo GR2M
 - gr2m_model_definition.py  
 - gr2m_parameter_initialization.py  
 - gr2m_calibration.py  
