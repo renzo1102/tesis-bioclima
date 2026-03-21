@@ -1,30 +1,36 @@
 """
 Script: precipitation_monthly_aggregation.py
 
-Descripción:
-Agrega precipitación diaria a mensual
+Descripción general
+-------------------
+Este script realiza la agregación de precipitación diaria
+post-control de calidad a escala mensual para el periodo
+2012–2022.
 
-Entradas:
-Datos diarios
+Se aplica un criterio de completitud temporal, donde solo
+se calcula el acumulado mensual si al menos el 80 % de los
+días del mes presentan datos válidos.
 
-Salidas:
-Serie mensual
+Entradas
+--------
+- Serie diaria depurada de precipitación post-QC
+
+Salidas
+-------
+- Serie mensual por estación
+- Resumen de disponibilidad mensual
 
 Autor: Renzo Mendoza
 Año: 2026
 """
-# ============================================================
-# SCRIPT 4
-# FASE 2 — AGREGACIÓN MENSUAL OBSERVADA
-# Basado en diario_post_qc_fase1.csv
-# ============================================================
 
 import pandas as pd
 import numpy as np
 import os
 
+
 # ============================================================
-# RUTAS
+# 1. CONFIGURACIÓN DE RUTAS
 # ============================================================
 
 INPUT_FILE = "outputs/post_qc/diario_post_qc_fase1.csv"
@@ -32,72 +38,123 @@ OUTPUT_DIR = "outputs/mensuales"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+
 # ============================================================
-# CARGAR DATOS
+# 2. CARGA Y FILTRO TEMPORAL
 # ============================================================
 
-print("\nCargando datos post-QC...")
-df = pd.read_csv(INPUT_FILE, parse_dates=["fecha"])
+print("\nCargando datos diarios post-QC...")
+
+df = pd.read_csv(
+    INPUT_FILE,
+    parse_dates=["fecha"]
+)
 
 df["anio"] = df["fecha"].dt.year
 df["mes"] = df["fecha"].dt.month
 
-df = df[(df["anio"] >= 2012) & (df["anio"] <= 2022)]
+"""
+Se restringe el análisis al periodo de estudio.
+"""
 
-print(f"Registros en periodo 2012–2022: {len(df)}")
+df = df[
+    (df["anio"] >= 2012) &
+    (df["anio"] <= 2022)
+]
+
+print(f"Registros en periodo: {len(df)}")
+
 
 # ============================================================
-# FUNCIÓN AGREGACIÓN MENSUAL
+# 3. FUNCIÓN DE AGREGACIÓN MENSUAL
 # ============================================================
 
 def calcular_mensual(grupo):
-    total_dias = grupo["fecha"].nunique()
-    dias_validos = grupo["Precip_postQC"].notna().sum()
 
-    porcentaje_validos = dias_validos / total_dias if total_dias > 0 else 0
+    """
+    Calcula precipitación mensual acumulada
+    considerando criterio de disponibilidad.
+
+    Si menos del 80 % de los días tienen datos válidos,
+    el mes se considera no confiable.
+    """
+
+    total_dias = grupo["fecha"].nunique()
+
+    dias_validos = grupo[
+        "Precip_postQC"
+    ].notna().sum()
+
+    porcentaje_validos = (
+        dias_validos / total_dias
+        if total_dias > 0 else 0
+    )
 
     if porcentaje_validos >= 0.80:
-        suma_mensual = grupo["Precip_postQC"].sum()
+
+        suma_mensual = grupo[
+            "Precip_postQC"
+        ].sum()
+
     else:
+
         suma_mensual = np.nan
 
     return pd.Series({
         "Prec_mensual": suma_mensual,
         "Dias_totales": total_dias,
         "Dias_validos": dias_validos,
-        "Porcentaje_validos": round(porcentaje_validos * 100, 2)
+        "Porcentaje_validos":
+            round(porcentaje_validos * 100, 2)
     })
 
+
 # ============================================================
-# AGREGACIÓN POR ESTACIÓN
+# 4. AGREGACIÓN POR ESTACIÓN
 # ============================================================
 
 mensual = (
-    df.groupby(["UH", "Estacion", "anio", "mes"])
-      .apply(calcular_mensual)
-      .reset_index()
+    df.groupby(
+        ["UH", "Estacion", "anio", "mes"]
+    )
+    .apply(calcular_mensual)
+    .reset_index()
 )
 
-# Crear fecha mensual tipo datetime (opcional, pero útil para fases siguientes)
+"""
+Se construye fecha mensual para facilitar
+integración con fases posteriores.
+"""
+
 mensual["fecha_mensual"] = pd.to_datetime(
     mensual["anio"].astype(str) + "-" +
     mensual["mes"].astype(str) + "-01"
 )
 
-# Guardar archivo general
+
+# ============================================================
+# 5. EXPORTACIÓN SERIE MENSUAL
+# ============================================================
+
 mensual.to_csv(
-    os.path.join(OUTPUT_DIR, "mensual_estaciones_2012_2022.csv"),
+    os.path.join(
+        OUTPUT_DIR,
+        "mensual_estaciones_2012_2022.csv"
+    ),
     index=False
 )
 
-print("Archivo mensual generado.")
+print("Serie mensual exportada.")
+
 
 # ============================================================
-# TABLA RESUMEN DISPONIBILIDAD MENSUAL
+# 6. RESUMEN DISPONIBILIDAD MENSUAL
 # ============================================================
 
 resumen_mensual = (
-    mensual.groupby(["UH", "Estacion"])["Prec_mensual"]
+    mensual.groupby(
+        ["UH", "Estacion"]
+    )["Prec_mensual"]
     .agg(
         meses_totales="size",
         meses_validos=lambda x: x.notna().sum(),
@@ -111,9 +168,11 @@ resumen_mensual["porcentaje_meses_validos"] = (
 ).round(2)
 
 resumen_mensual.to_csv(
-    os.path.join(OUTPUT_DIR, "resumen_disponibilidad_mensual.csv")
+    os.path.join(
+        OUTPUT_DIR,
+        "resumen_disponibilidad_mensual.csv"
+    )
 )
 
-print("Tabla resumen mensual generada.")
-
-print("\nFASE 2 COMPLETADA CORRECTAMENTE.")
+print("Resumen mensual generado.")
+print("\nFASE 2 completada.")
