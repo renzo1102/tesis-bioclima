@@ -1,29 +1,41 @@
 """
 Script: chirps_bias_correction.py
 
-Descripción:
-Corrige sesgo CHIRPS
+Descripción general
+-------------------
+Este script realiza la corrección de sesgo mensual del producto satelital
+de precipitación CHIRPS utilizando como referencia una estación
+observada (ANA 1).
 
-Entradas:
-CHIRPS, estaciones
+Se calcula un factor de corrección multiplicativo mensual basado en la
+relación entre precipitación observada y estimada por CHIRPS.
 
-Salidas:
-CHIRPS corregido
+Posteriormente, este factor se aplica a las series satelitales de
+precipitación en distintas unidades hidrográficas con el objetivo de
+reducir errores sistemáticos del producto remoto.
 
-Autor: Renzo Mendoza
+Entradas
+--------
+- Series mensuales observadas (estaciones)
+- Series mensuales CHIRPS
+
+Salidas
+-------
+- Factores mensuales de corrección
+- Series CHIRPS corregidas
+- Métricas de desempeño post-corrección
+
+Autor: Renzo Mendoza  
 Año: 2026
 """
-# ============================================================
-# SCRIPT 9
-# FASE 6 — CORRECCIÓN MENSUAL CHIRPS (BASE ANA 1)
-# ============================================================
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
+
 # ============================================================
-# RUTAS
+# CONFIGURACIÓN DE RUTAS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,8 +45,9 @@ OUTPUT_DIR = BASE_DIR / "outputs/chirps_corregido"
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
 # ============================================================
-# CARGAR ANA 1 OBSERVADO
+# CARGA DE PRECIPITACIÓN OBSERVADA (BASE ANA 1)
 # ============================================================
 
 estaciones = pd.read_csv(
@@ -48,23 +61,52 @@ ana1_obs = estaciones[
     columns={"Prec_mensual": "ANA1_OBS"}
 )
 
+"""
+Este bloque:
+- Selecciona la estación de referencia
+- Define la serie observada usada para calibración del sesgo
+"""
+
+
 # ============================================================
-# CARGAR CHIRPS
+# FUNCIÓN: CARGAR SERIE CHIRPS
 # ============================================================
 
 def cargar_chirps(nombre_archivo, nueva_col):
+    """
+    Carga una serie mensual CHIRPS y construye variables temporales.
+
+    Parámetros
+    ----------
+    nombre_archivo : str
+        Nombre del archivo CSV.
+
+    nueva_col : str
+        Nombre que tomará la columna CHIRPS.
+
+    Retorna
+    -------
+    DataFrame
+        Serie temporal preparada.
+    """
+
     df = pd.read_csv(INPUT_CHIRPS / nombre_archivo)
+
     df["fecha_mensual"] = pd.to_datetime(df["date"] + "-01")
     df["mes"] = df["fecha_mensual"].dt.month
+
     df = df.rename(columns={"CHIRPS": nueva_col})
+
     return df
+
 
 ana1_ch = cargar_chirps("CHIRPS_ANA1_2012_2022.csv", "CHIRPS_ANA1")
 matoc_ch = cargar_chirps("CHIRPS_MATOC_2012_2022.csv", "CHIRPS_MATOC")
 pocco_ch = cargar_chirps("CHIRPS_POCCO_2012_2022.csv", "CHIRPS_POCCO")
 
+
 # ============================================================
-# CALCULAR FACTORES MENSUALES (BASE ANA 1)
+# CÁLCULO DE FACTORES DE CORRECCIÓN MENSUAL
 # ============================================================
 
 df_factor = ana1_obs.merge(
@@ -78,63 +120,84 @@ df_factor["mes"] = df_factor["fecha_mensual"].dt.month
 factores = (
     df_factor
     .groupby("mes")
-    .apply(lambda x: x["ANA1_OBS"].mean() / x["CHIRPS_ANA1"].mean())
+    .apply(
+        lambda x:
+        x["ANA1_OBS"].mean() /
+        x["CHIRPS_ANA1"].mean()
+    )
     .reset_index(name="Factor_correccion")
 )
+
+"""
+Este bloque calcula un factor multiplicativo mensual:
+
+Factor = media_obs / media_CHIRPS
+
+Esto corrige sesgos sistemáticos del satélite
+como subestimación en meses húmedos o sobreestimación en meses secos.
+"""
 
 factores.to_csv(
     OUTPUT_DIR / "factores_mensuales_base_ANA1.csv",
     index=False
 )
 
-print("\nFACTORES MENSUALES:")
-print(factores)
 
 # ============================================================
-# APLICAR CORRECCIÓN
+# FUNCIÓN: APLICAR CORRECCIÓN
 # ============================================================
 
 def aplicar_correccion(df, col_name):
+    """
+    Aplica el factor mensual de corrección a una serie CHIRPS.
+
+    Retorna
+    -------
+    DataFrame corregido.
+    """
+
     df = df.merge(factores, on="mes", how="left")
-    df[f"{col_name}_CORR"] = df[col_name] * df["Factor_correccion"]
+
+    df[f"{col_name}_CORR"] = (
+        df[col_name] *
+        df["Factor_correccion"]
+    )
+
     return df
+
 
 ana1_corr = aplicar_correccion(ana1_ch, "CHIRPS_ANA1")
 matoc_corr = aplicar_correccion(matoc_ch, "CHIRPS_MATOC")
 pocco_corr = aplicar_correccion(pocco_ch, "CHIRPS_POCCO")
 
-# ============================================================
-# GUARDAR SERIES CORREGIDAS
-# ============================================================
-
-ana1_corr.to_csv(
-    OUTPUT_DIR / "CHIRPS_ANA1_corregido.csv",
-    index=False
-)
-
-matoc_corr.to_csv(
-    OUTPUT_DIR / "CHIRPS_MATOC_corregido.csv",
-    index=False
-)
-
-pocco_corr.to_csv(
-    OUTPUT_DIR / "CHIRPS_POCCO_corregido.csv",
-    index=False
-)
 
 # ============================================================
-# FUNCIÓN MÉTRICAS
+# FUNCIÓN: CÁLCULO DE MÉTRICAS HIDROLÓGICAS
 # ============================================================
 
 def calcular_metricas(obs, pred):
+    """
+    Calcula métricas de desempeño entre serie observada y estimada.
+
+    Métricas:
+    - Correlación
+    - RMSE
+    - Bias
+    - NSE (Nash-Sutcliffe Efficiency)
+
+    Retorna diccionario de resultados.
+    """
 
     mask = (~obs.isna()) & (~pred.isna())
+
     obs = obs[mask]
     pred = pred[mask]
 
     r = np.corrcoef(obs, pred)[0, 1]
     r2 = r ** 2
+
     rmse = np.sqrt(np.mean((obs - pred) ** 2))
+
     bias = pred.mean() - obs.mean()
     bias_pct = (bias / obs.mean()) * 100
 
@@ -153,8 +216,9 @@ def calcular_metricas(obs, pred):
         "n_meses": len(obs)
     }
 
+
 # ============================================================
-# EVALUACIÓN POST CORRECCIÓN (ANA 1)
+# EVALUACIÓN POST CORRECCIÓN
 # ============================================================
 
 df_eval = ana1_obs.merge(
@@ -168,13 +232,9 @@ metricas_post = calcular_metricas(
     df_eval["CHIRPS_ANA1_CORR"]
 )
 
-metricas_df = pd.DataFrame([metricas_post])
-metricas_df.to_csv(
+pd.DataFrame([metricas_post]).to_csv(
     OUTPUT_DIR / "metricas_post_correccion_ANA1.csv",
     index=False
 )
 
-print("\nMÉTRICAS DESPUÉS DE CORRECCIÓN (ANA 1):")
-print(metricas_post)
-
-print("\nFASE 6 COMPLETADA CORRECTAMENTE.")
+print("Corrección CHIRPS completada correctamente")
