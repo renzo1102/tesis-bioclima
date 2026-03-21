@@ -1,42 +1,63 @@
 """
-Script: gee_build_ndvi_collection.js
+Script: gee_build_ndvi_collection.py
 
-Descripción:
-Construye colección NDVI en GEE combinando Landsat y Sentinel
+Descripción general
+-------------------
+Este script construye una colección temporal de NDVI en Google Earth Engine
+integrando imágenes Landsat 7, Landsat 8, Landsat 9 y Sentinel-2 Harmonized.
 
-Entradas:
-Imágenes satelitales, área de estudio
+Se aplican máscaras de calidad para eliminar nubes y sombras de nubes, y
+posteriormente se calcula el índice NDVI para cada sensor.
 
-Salidas:
-Colección NDVI
+Periodo de análisis: 2012–2022.
 
-Autor: Renzo Mendoza
+Entradas
+--------
+- Colecciones satelitales Landsat Collection 2 Level-2
+- Colección Sentinel-2 Surface Reflectance Harmonized
+
+Salidas
+-------
+- Colección integrada de imágenes con banda NDVI
+
+Autor: Renzo Mendoza  
 Año: 2026
 """
-# =====================================================
-# SCRIPT 1
-# Construir colección NDVI combinada
-# Landsat 7–8–9 + Sentinel-2 Harmonized
-# Periodo: 2012–2022
-# =====================================================
 import ee
 
 # =====================================================
-# INICIALIZAR EARTH ENGINE
+# INICIALIZACIÓN DE GOOGLE EARTH ENGINE
 # =====================================================
 ee.Initialize(project="rmendozab")
 print("Conectado a Google Earth Engine")
 
 
 # =====================================================
-# ---------------- LANDSAT ----------------------------
+# FUNCIONES PARA LANDSAT
 # =====================================================
 
 def mask_landsat(image):
+    """
+    Aplica una máscara de calidad a imágenes Landsat utilizando la banda QA_PIXEL.
+
+    Se eliminan píxeles afectados por:
+    - Nubes
+    - Sombras de nube
+
+    Parámetros
+    ----------
+    image : ee.Image
+        Imagen Landsat Collection 2 Level-2.
+
+    Retorna
+    -------
+    ee.Image
+        Imagen con píxeles válidos únicamente.
+    """
     qa = image.select("QA_PIXEL")
 
     mask = (
-        qa.bitwiseAnd(1 << 3).eq(0)  # nubes
+        qa.bitwiseAnd(1 << 3).eq(0)  # nube
         .And(qa.bitwiseAnd(1 << 4).eq(0))  # sombra de nube
     )
 
@@ -44,36 +65,85 @@ def mask_landsat(image):
 
 
 def add_ndvi_l89(img):
+    """
+    Calcula NDVI para imágenes Landsat 8 y Landsat 9.
+
+    Bandas utilizadas:
+    - NIR: SR_B5
+    - Red: SR_B4
+
+    Parámetros
+    ----------
+    img : ee.Image
+
+    Retorna
+    -------
+    ee.Image
+        Imagen con banda adicional NDVI.
+    """
     img = mask_landsat(img)
+
     ndvi = img.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI")
+
     return img.addBands(ndvi)
 
 
 def add_ndvi_l7(img):
+    """
+    Calcula NDVI para imágenes Landsat 7.
+
+    Bandas utilizadas:
+    - NIR: SR_B4
+    - Red: SR_B3
+    """
     img = mask_landsat(img)
+
     ndvi = img.normalizedDifference(["SR_B4", "SR_B3"]).rename("NDVI")
+
     return img.addBands(ndvi)
 
 
 # =====================================================
-# ---------------- SENTINEL-2 --------------------------
+# FUNCIONES PARA SENTINEL-2
 # =====================================================
 
 def mask_sentinel_scl(img):
+    """
+    Aplica máscara de calidad usando la banda Scene Classification Layer (SCL).
 
+    Se conservan únicamente píxeles:
+    - Vegetación
+    - Suelo desnudo
+    - Agua
+
+    Parámetros
+    ----------
+    img : ee.Image
+
+    Retorna
+    -------
+    ee.Image
+        Imagen filtrada por calidad.
+    """
     scl = img.select("SCL")
 
     mask = (
-        scl.eq(4)   # vegetación
-        .Or(scl.eq(5))  # suelo desnudo
-        .Or(scl.eq(6))  # agua
+        scl.eq(4)
+        .Or(scl.eq(5))
+        .Or(scl.eq(6))
     )
 
     return img.updateMask(mask)
 
 
 def add_ndvi_s2(img):
+    """
+    Calcula NDVI para imágenes Sentinel-2.
 
+    Bandas utilizadas:
+    - NIR: B8
+    - Red: B4
+    """
     img = mask_sentinel_scl(img)
 
     ndvi = img.normalizedDifference(["B8", "B4"]).rename("NDVI")
@@ -82,7 +152,7 @@ def add_ndvi_s2(img):
 
 
 # =====================================================
-# COLECCIONES (2012–2022)
+# CONSTRUCCIÓN DE COLECCIONES TEMPORALES
 # =====================================================
 
 L7 = (
@@ -111,7 +181,7 @@ S2 = (
 )
 
 # =====================================================
-# COLECCIÓN FINAL
+# COLECCIÓN INTEGRADA FINAL
 # =====================================================
 
 ndvi_all = L7.merge(L8).merge(L9).merge(S2)
