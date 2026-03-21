@@ -1,19 +1,35 @@
 """
 Script: ndvi_trend_analysis.py
-Descripción:
-Evalúa tendencias NDVI (Mann-Kendall)
-Entradas:
-NDVI mensual
-Salidas:
-Tendencias, gráficos
 
-Autor: Renzo Mendoza
+Descripción general
+-------------------
+Este script evalúa la presencia de tendencias temporales en las series
+mensuales de NDVI mediante métodos estadísticos paramétricos y no
+paramétricos.
+
+Se aplican:
+
+- Regresión lineal simple para estimar tendencia y coeficiente de determinación
+- Test de Mann-Kendall para detección robusta de tendencia monotónica
+- Análisis de correlación entre microcuencas
+- Comparación temporal conjunta
+
+Además, se generan tablas estadísticas y promedios climáticos mensuales
+y anuales de NDVI.
+
+Entradas
+--------
+- Series mensuales NDVI interpoladas
+
+Salidas
+-------
+- Figura multipanel de tendencias y correlación
+- Tabla CSV de estadísticas de tendencia
+- Promedios anuales y mensuales de NDVI
+
+Autor: Renzo Mendoza  
 Año: 2026
 """
-# =====================================================
-# SCRIPT 5
-# Exportación de tablas estadísticas mnesuales y anuales 
-# =====================================================
 
 import pandas as pd
 import numpy as np
@@ -22,8 +38,9 @@ from scipy.stats import linregress, pearsonr
 import pymannkendall as mk
 import os
 
+
 # =====================================================
-# ESTILO REVISTA CIENTÍFICA
+# CONFIGURACIÓN ESTÉTICA (FORMATO REVISTA CIENTÍFICA)
 # =====================================================
 
 plt.rcParams.update({
@@ -45,21 +62,21 @@ plt.rcParams.update({
 # COLORES
 # =====================================================
 
-COLOR_MATOC = "#4FA3D9"      # celeste
-COLOR_POCCO = "#F4A261"     # naranja claro
+COLOR_MATOC = "#4FA3D9"
+COLOR_POCCO = "#F4A261"
 COLOR_TREND = "#6E6E6E"
-COLOR_CORR_POINTS = "#7A7A7A"   # gris plomo
-COLOR_CORR_LINE = "#4D4D4D"     # gris más notorio
+COLOR_CORR_POINTS = "#7A7A7A"
+COLOR_CORR_LINE = "#4D4D4D"
 
 # =====================================================
-# DIRECTORIOS
+# CREACIÓN DE DIRECTORIOS
 # =====================================================
 
 os.makedirs("outputs/figuras", exist_ok=True)
 os.makedirs("outputs/estadisticas", exist_ok=True)
 
 # =====================================================
-# CARGA DE DATOS (INTERPOLADOS)
+# CARGA Y PREPARACIÓN DE DATOS
 # =====================================================
 
 matoc = pd.read_csv("outputs/csv/NDVI_MATOC_interpolado.csv")
@@ -71,10 +88,7 @@ pocco["Fecha"] = pd.to_datetime(pocco[['Year','Month']].assign(DAY=1))
 matoc = matoc.sort_values("Fecha")
 pocco = pocco.sort_values("Fecha")
 
-# =====================================================
-# UNIÓN TEMPORAL
-# =====================================================
-
+# Unión temporal para análisis comparativo
 merged = pd.merge(
     matoc[["Fecha","NDVI"]],
     pocco[["Fecha","NDVI"]],
@@ -83,20 +97,24 @@ merged = pd.merge(
 )
 
 # =====================================================
-# TENDENCIAS Y TESTS
+# ANÁLISIS DE TENDENCIA
 # =====================================================
 
-# Matoc
+# Regresión lineal Matoc
 x_m = np.arange(len(matoc))
 slope_m, intercept_m, r_m, p_m, _ = linregress(x_m, matoc["NDVI"])
+
+# Test Mann-Kendall Matoc
 mk_m = mk.original_test(matoc["NDVI"])
 
-# Pocco
+# Regresión lineal Pocco
 x_p = np.arange(len(pocco))
 slope_p, intercept_p, r_p, p_p, _ = linregress(x_p, pocco["NDVI"])
+
+# Test Mann-Kendall Pocco
 mk_p = mk.original_test(pocco["NDVI"])
 
-# Correlación
+# Correlación entre microcuencas
 r_c, p_c = pearsonr(
     merged["NDVI_Matoc"],
     merged["NDVI_Pocco"]
@@ -108,51 +126,44 @@ r_c, p_c = pearsonr(
 
 fig, axs = plt.subplots(2, 2, figsize=(7, 5))
 
-# (a) Serie Matoc
+# Serie temporal Matoc
 axs[0,0].plot(matoc["Fecha"], matoc["NDVI"], color=COLOR_MATOC)
 axs[0,0].plot(matoc["Fecha"], intercept_m + slope_m*x_m,
               linestyle="--", color=COLOR_TREND)
+
 axs[0,0].set_ylabel("NDVI")
 axs[0,0].set_title("(a) Serie temporal Matoc", loc="left")
-axs[0,0].text(
-    0.02, 0.95,
-    f"R² = {r_m**2:.3f}\np = {p_m:.3f}\nMK: {mk_m.trend}",
-    transform=axs[0,0].transAxes,
-    va="top",
-    bbox=dict(facecolor="white", edgecolor="none")
-)
 
-# (b) Serie Pocco
+# Serie temporal Pocco
 axs[0,1].plot(pocco["Fecha"], pocco["NDVI"], color=COLOR_POCCO)
 axs[0,1].plot(pocco["Fecha"], intercept_p + slope_p*x_p,
               linestyle="--", color=COLOR_TREND)
-axs[0,1].set_title("(b) Serie temporal Pocco", loc="left")
-axs[0,1].text(
-    0.02, 0.95,
-    f"R² = {r_p**2:.3f}\np = {p_p:.3f}\nMK: {mk_p.trend}",
-    transform=axs[0,1].transAxes,
-    va="top",
-    bbox=dict(facecolor="white", edgecolor="none")
-)
 
-# (c) Comparación temporal
+axs[0,1].set_title("(b) Serie temporal Pocco", loc="left")
+
+# Comparación temporal
 axs[1,0].plot(merged["Fecha"], merged["NDVI_Matoc"],
               color=COLOR_MATOC, label="Matoc")
 axs[1,0].plot(merged["Fecha"], merged["NDVI_Pocco"],
               color=COLOR_POCCO, label="Pocco")
+
 axs[1,0].set_ylabel("NDVI")
 axs[1,0].set_xlabel("Año")
 axs[1,0].set_title("(c) Comparación temporal", loc="left")
 axs[1,0].legend(frameon=False)
 
-# (d) Correlación
+# Correlación
 axs[1,1].scatter(
     merged["NDVI_Matoc"],
     merged["NDVI_Pocco"],
     facecolors="none",
     edgecolors=COLOR_CORR_POINTS,
-    s=22,
-    linewidths=0.8
+    s=22
+)
+
+slope_c, intercept_c, _, _, _ = linregress(
+    merged["NDVI_Matoc"],
+    merged["NDVI_Pocco"]
 )
 
 x_line = np.linspace(
@@ -161,43 +172,29 @@ x_line = np.linspace(
     100
 )
 
-slope_c, intercept_c, _, _, _ = linregress(
-    merged["NDVI_Matoc"],
-    merged["NDVI_Pocco"]
-)
-
 axs[1,1].plot(
     x_line,
     intercept_c + slope_c*x_line,
     linestyle="--",
-    color=COLOR_CORR_LINE,
-    linewidth=1.3
+    color=COLOR_CORR_LINE
 )
 
 axs[1,1].set_xlabel("Matoc")
 axs[1,1].set_ylabel("Pocco")
 axs[1,1].set_title("(d) Correlación NDVI", loc="left")
-axs[1,1].text(
-    0.02, 0.95,
-    f"r = {r_c:.2f}\np < 0.001",
-    transform=axs[1,1].transAxes,
-    va="top",
-    bbox=dict(facecolor="white", edgecolor="none")
-)
+
 for ax in axs.flat:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.tick_params(width=0.6, length=3)
 
 plt.tight_layout()
 plt.savefig("outputs/figuras/Figura_3_Tendencias_NDVI.png")
 plt.close()
 
 # =====================================================
-# EXPORTAR TABLAS ESTADÍSTICAS
+# EXPORTACIÓN DE TABLAS
 # =====================================================
 
-# Tabla principal
 estadisticas = pd.DataFrame({
     "Serie": ["Matoc", "Pocco", "Correlación"],
     "Pendiente": [slope_m, slope_p, slope_c],
@@ -211,39 +208,26 @@ estadisticas.to_csv(
     index=False
 )
 
-# =====================================================
-# PROMEDIO ANUAL
-# =====================================================
+# Promedios anuales
+prom_anual = pd.concat([
+    matoc.groupby("Year")["NDVI"].mean().reset_index().assign(Serie="Matoc"),
+    pocco.groupby("Year")["NDVI"].mean().reset_index().assign(Serie="Pocco")
+])
 
-matoc_anual = matoc.groupby("Year")["NDVI"].mean().reset_index()
-matoc_anual["Serie"] = "Matoc"
-
-pocco_anual = pocco.groupby("Year")["NDVI"].mean().reset_index()
-pocco_anual["Serie"] = "Pocco"
-
-prom_anual = pd.concat([matoc_anual, pocco_anual])
 prom_anual.to_csv(
     "outputs/estadisticas/NDVI_promedio_anual.csv",
     index=False
 )
 
-# =====================================================
-# PROMEDIO MENSUAL
-# =====================================================
+# Promedios mensuales
+prom_mensual = pd.concat([
+    matoc.groupby("Month")["NDVI"].mean().reset_index().assign(Serie="Matoc"),
+    pocco.groupby("Month")["NDVI"].mean().reset_index().assign(Serie="Pocco")
+])
 
-matoc_mensual = matoc.groupby("Month")["NDVI"].mean().reset_index()
-matoc_mensual["Serie"] = "Matoc"
-
-pocco_mensual = pocco.groupby("Month")["NDVI"].mean().reset_index()
-pocco_mensual["Serie"] = "Pocco"
-
-prom_mensual = pd.concat([matoc_mensual, pocco_mensual])
 prom_mensual.to_csv(
     "outputs/estadisticas/NDVI_promedio_mensual.csv",
     index=False
 )
 
-print("Script 3 ejecutado correctamente")
-print("Figura exportada")
-print("Tablas estadísticas, mensuales y anuales exportadas")
-
+print("Análisis de tendencias NDVI completado correctamente")
