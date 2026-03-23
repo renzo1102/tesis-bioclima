@@ -1,5 +1,3 @@
-# TesisPre-RenzoMendoza
-
 ## Influencia de los parámetros bioclimáticos en el caudal de las unidades hidrográficas Matoc y Pocco, Recuay, 2012–2022
 
 ---
@@ -237,5 +235,5 @@ MIT License
 
 Renzo Mendoza  
 Facultad de Ciencias del Ambiente  
-Universidad Nacional Santiago Antúnez de Mayolo (UNASAM)  
 Centro de Investigación en Ciencias de la Tierra, Ambiente y Tecnología (ESAT-FCAM)  
+Universidad Nacional Santiago Antúnez de Mayolo (UNASAM)  
