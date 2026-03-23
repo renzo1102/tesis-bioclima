@@ -1,163 +1,349 @@
-# ==========================================================
-# FASE 4
-# MENSUALIZACIÓN DE TEMPERATURA
-# ==========================================================
+# ============================================================
+# FASE 8 — VALIDACIÓN CRUZADA ROBUSTA (MONTE CARLO)
+# ============================================================
+"""
+OBJETIVO GENERAL
+---------------
+Evaluar la robustez del modelo de completación mensual (FASE 7)
+mediante simulaciones de pérdida de datos y reconstrucción.
+
+ENFOQUE METODOLÓGICO
+--------------------
+Se implementa validación cruzada tipo Monte Carlo:
+- 30 iteraciones independientes
+- En cada iteración:
+    1. Se elimina aleatoriamente el 20% de los datos observados
+    2. Se entrena un modelo de regresión (UH vs ANA1)
+    3. Se reconstruyen los datos eliminados
+    4. Se comparan contra valores reales
+
+JERARQUÍA DE RECONSTRUCCIÓN
+---------------------------
+1. Regresión lineal con estación ANA1
+2. Datos CHIRPS corregidos (fallback)
+
+ENTRADAS
+--------
+- 4_Matoc_UH_mensual_OBS.csv
+- 4_Pocco_UH_mensual_OBS.csv
+- mensual_estaciones_2012_2022.csv
+- CHIRPS_*_corregido.csv
+
+SALIDAS
+-------
+1. resultados_iteraciones_validacion_cruzada.csv
+   → métricas por iteración
+
+2. resumen_promedio_validacion_cruzada.csv
+   → promedio de métricas por UH
+"""
+
+# ============================================================
+# 1. LIBRERÍAS
+# ============================================================
 
 import pandas as pd
-from pathlib import Path
 import numpy as np
+from pathlib import Path
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-# ----------------------------------------------------------
-# RUTAS
-# ----------------------------------------------------------
+# ============================================================
+# 2. REPRODUCIBILIDAD
+# ============================================================
+# Fija semilla para obtener siempre los mismos resultados
 
-BASE_DIR = Path(__file__).resolve().parents[1]
+np.random.seed(42)
 
-INPUT_DIR = BASE_DIR / "data_raw"
-OUTPUT_DIR = BASE_DIR / "data_mensual"
+# ============================================================
+# 3. RUTAS
+# ============================================================
 
-OUTPUT_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ----------------------------------------------------------
-# ARCHIVOS
-# ----------------------------------------------------------
+INPUT_MENSUALES = BASE_DIR / "outputs/mensuales"
+INPUT_CHIRPS = BASE_DIR / "outputs/chirps_corregido"
+OUTPUT_DIR = BASE_DIR / "outputs/validacion_cruzada"
 
-archivos_T = [
-    "T_Matoc_diario.csv",
-    "T_Pocco_diario.csv"
-]
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-resumen = []
+# ============================================================
+# 4. CARGA DE DATOS
+# ============================================================
 
-# ----------------------------------------------------------
-# CALENDARIO FIJO
-# ----------------------------------------------------------
+print("\nCargando datos de entrada...")
 
-rango = pd.date_range("2012-01-01","2022-12-31",freq="D")
+# -------------------------
+# 4.1 Series UH observadas
+# -------------------------
+matoc_obs = pd.read_csv(
+    INPUT_MENSUALES / "4_Matoc_UH_mensual_OBS.csv",
+    parse_dates=["fecha_mensual"]
+)
 
-# ----------------------------------------------------------
-# PROCESAMIENTO
-# ----------------------------------------------------------
+pocco_obs = pd.read_csv(
+    INPUT_MENSUALES / "4_Pocco_UH_mensual_OBS.csv",
+    parse_dates=["fecha_mensual"]
+)
 
-for archivo_nombre in archivos_T:
+# -------------------------
+# 4.2 Estaciones (incluye ANA1)
+# -------------------------
+estaciones = pd.read_csv(
+    INPUT_MENSUALES / "mensual_estaciones_2012_2022.csv",
+    parse_dates=["fecha_mensual"]
+)
 
-    archivo = INPUT_DIR / archivo_nombre
+# Selección de estación de referencia
+ana1 = estaciones[
+    estaciones["Estacion"] == "ANA 1"
+][["fecha_mensual", "Prec_mensual"]].rename(
+    columns={"Prec_mensual": "ANA1"}
+)
 
-    print("\n-----------------------------------")
-    print("Procesando:", archivo.name)
+# -------------------------
+# 4.3 CHIRPS corregido
+# -------------------------
+matoc_ch = pd.read_csv(
+    INPUT_CHIRPS / "CHIRPS_MATOC_corregido.csv",
+    parse_dates=["fecha_mensual"]
+)
 
-    # detectar separador
-    with open(archivo, "r", encoding="utf-8") as f:
-        primera_linea = f.readline()
+pocco_ch = pd.read_csv(
+    INPUT_CHIRPS / "CHIRPS_POCCO_corregido.csv",
+    parse_dates=["fecha_mensual"]
+)
 
-    sep = ";" if ";" in primera_linea else ","
+# ============================================================
+# 5. FUNCIÓN: calcular_metricas
+# ============================================================
+def calcular_metricas(obs, pred):
+    """
+    Calcula métricas de desempeño hidrológico.
 
-    df = pd.read_csv(archivo, sep=sep)
+    PARÁMETROS
+    ----------
+    obs : array-like
+        Serie de valores observados (verdaderos)
 
-    df.columns = df.columns.str.strip()
+    pred : array-like
+        Serie de valores estimados (modelo)
 
-    # ------------------------------------------------------
-    # FECHA
-    # ------------------------------------------------------
+    RETORNA
+    -------
+    r : float
+        Correlación de Pearson
 
-    df["fecha"] = pd.to_datetime(
-        df["fecha"],
-        dayfirst=True,
-        errors="coerce"
+    r2 : float
+        Coeficiente de determinación
+
+    rmse : float
+        Raíz del error cuadrático medio
+
+    mae : float
+        Error absoluto medio
+
+    bias_pct : float
+        Sesgo relativo (%)
+
+    nse : float
+        Eficiencia de Nash-Sutcliffe
+
+    INTERPRETACIÓN
+    --------------
+    - R² alto → buena capacidad explicativa
+    - RMSE bajo → bajo error
+    - Bias cercano a 0 → sin sesgo
+    - NSE > 0.6 → modelo aceptable
+    """
+
+    # Correlación
+    r = np.corrcoef(obs, pred)[0, 1]
+
+    # Coeficiente de determinación
+    r2 = r ** 2
+
+    # Error cuadrático medio
+    rmse = np.sqrt(mean_squared_error(obs, pred))
+
+    # Error absoluto medio
+    mae = mean_absolute_error(obs, pred)
+
+    # Sesgo porcentual
+    bias = pred.mean() - obs.mean()
+    bias_pct = (bias / obs.mean()) * 100
+
+    # Nash-Sutcliffe Efficiency
+    nse = 1 - (
+        np.sum((obs - pred) ** 2) /
+        np.sum((obs - obs.mean()) ** 2)
     )
 
-    df = df.dropna(subset=["fecha"])
+    return r, r2, rmse, mae, bias_pct, nse
 
-    df["Tmed"] = pd.to_numeric(df["Tmed"], errors="coerce")
+# ============================================================
+# 6. FUNCIÓN: validacion_montecarlo
+# ============================================================
+def validacion_montecarlo(uh_obs, chirps_df, nombre_uh):
+    """
+    Ejecuta validación cruzada Monte Carlo.
 
-    # ------------------------------------------------------
-    # CALENDARIO COMPLETO
-    # ------------------------------------------------------
+    PARÁMETROS
+    ----------
+    uh_obs : DataFrame
+        Serie mensual observada de la UH
+        Columnas:
+            - fecha_mensual
+            - Prec_UH_OBS
 
-    calendario = pd.DataFrame({"fecha": rango})
+    chirps_df : DataFrame
+        Serie CHIRPS corregida
+        Última columna = precipitación corregida
 
-    df = calendario.merge(df, on="fecha", how="left")
+    nombre_uh : str
+        Nombre de la unidad hidrológica
 
-    # ------------------------------------------------------
-    # AÑO Y MES
-    # ------------------------------------------------------
+    RETORNA
+    -------
+    DataFrame con métricas por iteración
 
-    df["anio"] = df["fecha"].dt.year
-    df["mes"] = df["fecha"].dt.month
+    PROCESO
+    --------
+    1. Integración de datos (UH + ANA1 + CHIRPS)
+    2. Loop Monte Carlo:
+        a. Eliminar 20% de datos
+        b. Entrenar modelo
+        c. Reconstruir datos eliminados
+        d. Evaluar desempeño
+    """
 
-    df["dias_mes"] = df["fecha"].dt.days_in_month
+    resultados = []
 
-    # ------------------------------------------------------
-    # PROMEDIO MENSUAL
-    # ------------------------------------------------------
+    # -------------------------
+    # 6.1 Integración de datos
+    # -------------------------
+    df = uh_obs.merge(ana1, on="fecha_mensual", how="left")
 
-    mensual = (
-        df.groupby(["anio","mes"])
-        .agg(
-            Tmed=("Tmed","mean"),
-            dias_validos=("Tmed","count"),
-            dias_mes=("dias_mes","first")
+    df = df.merge(
+        chirps_df[["fecha_mensual", chirps_df.columns[-1]]],
+        on="fecha_mensual",
+        how="left"
+    )
+
+    # Solo registros con dato observado real
+    df = df.dropna(subset=["Prec_UH_OBS"])
+
+    # ========================================================
+    # 6.2 LOOP MONTE CARLO
+    # ========================================================
+    for i in range(30):
+
+        df_iter = df.copy()
+
+        # -------------------------
+        # (a) Eliminación aleatoria
+        # -------------------------
+        n_remove = int(len(df_iter) * 0.2)
+
+        idx_remove = np.random.choice(
+            df_iter.index,
+            n_remove,
+            replace=False
         )
-        .reset_index()
-    )
 
-    # ------------------------------------------------------
-    # COBERTURA
-    # ------------------------------------------------------
+        df_iter.loc[idx_remove, "Prec_UH_OBS"] = np.nan
 
-    mensual["cobertura"] = mensual["dias_validos"] / mensual["dias_mes"]
+        # -------------------------
+        # (b) Entrenamiento modelo
+        # -------------------------
+        df_train = df_iter.dropna(subset=["Prec_UH_OBS", "ANA1"])
 
-    # regla 70%
-    mensual.loc[mensual["cobertura"] < 0.7, "Tmed"] = np.nan
+        X_train = df_train[["ANA1"]].values
+        y_train = df_train["Prec_UH_OBS"].values
 
-    # ------------------------------------------------------
-    # FECHA
-    # ------------------------------------------------------
+        modelo = LinearRegression()
+        modelo.fit(X_train, y_train)
 
-    mensual["fecha"] = pd.to_datetime(dict(
-        year=mensual.anio,
-        month=mensual.mes,
-        day=1
-    ))
+        # -------------------------
+        # (c) Reconstrucción
+        # -------------------------
+        predicciones = []
+        reales = []
 
-    mensual = mensual[[
-        "fecha",
-        "Tmed",
-        "dias_validos",
-        "dias_mes",
-        "cobertura"
-    ]]
+        for idx in idx_remove:
 
-    # ------------------------------------------------------
-    # GUARDAR
-    # ------------------------------------------------------
+            row = df.loc[idx]
 
-    nombre_salida = archivo_nombre.replace("_diario","_mensual")
+            # Prioridad 1: regresión
+            if not pd.isna(row["ANA1"]):
+                pred = modelo.predict([[row["ANA1"]]])[0]
 
-    salida = OUTPUT_DIR / nombre_salida
+            # Prioridad 2: CHIRPS
+            else:
+                pred = row[chirps_df.columns[-1]]
 
-    mensual.to_csv(salida,index=False)
+            predicciones.append(max(pred, 0))
+            reales.append(row["Prec_UH_OBS"])
 
-    print("Archivo guardado:", salida)
+        # -------------------------
+        # (d) Evaluación
+        # -------------------------
+        r, r2, rmse, mae, bias_pct, nse = calcular_metricas(
+            np.array(reales),
+            np.array(predicciones)
+        )
 
-    resumen.append({
-        "archivo": archivo_nombre,
-        "meses_generados": len(mensual),
-        "T_media_global": round(mensual["Tmed"].mean(),2)
-    })
+        resultados.append({
+            "UH": nombre_uh,
+            "Iteracion": i + 1,
+            "R": r,
+            "R2": r2,
+            "RMSE": rmse,
+            "MAE": mae,
+            "Bias_%": bias_pct,
+            "NSE": nse
+        })
 
-# ----------------------------------------------------------
-# RESUMEN
-# ----------------------------------------------------------
+    return pd.DataFrame(resultados)
 
-resumen_df = pd.DataFrame(resumen)
+# ============================================================
+# 7. EJECUCIÓN DEL MODELO
+# ============================================================
 
-resumen_path = OUTPUT_DIR / "resumen_temperatura_mensual.csv"
+print("\nEjecutando validación Monte Carlo...")
 
-resumen_df.to_csv(resumen_path,index=False)
+res_matoc = validacion_montecarlo(
+    matoc_obs, matoc_ch, "Matoc"
+)
 
-print("\n===================================")
-print("MENSUALIZACIÓN DE TEMPERATURA FINALIZADA")
-print("Resumen guardado en:")
-print(resumen_path)
-print("===================================")
+res_pocco = validacion_montecarlo(
+    pocco_obs, pocco_ch, "Pocco"
+)
+
+# Unificación
+resultados_totales = pd.concat([res_matoc, res_pocco])
+
+# ============================================================
+# 8. EXPORTACIÓN
+# ============================================================
+
+# Resultados por iteración
+resultados_totales.to_csv(
+    OUTPUT_DIR / "resultados_iteraciones_validacion_cruzada.csv",
+    index=False
+)
+
+# Promedio final
+resumen_final = resultados_totales.groupby("UH").mean(numeric_only=True)
+
+resumen_final.to_csv(
+    OUTPUT_DIR / "resumen_promedio_validacion_cruzada.csv"
+)
+
+# ============================================================
+# 9. SALIDA FINAL
+# ============================================================
+
+print("\nFASE 8 COMPLETADA.")
+print("\nResumen promedio por UH:")
+print(resumen_final)
