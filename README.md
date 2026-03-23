@@ -53,7 +53,7 @@ tesis-bioclima/
 │   │   └── Temperatura/
 │   │
 │   ├── 02_Hidrologia/
-│   ├── 03_Estadistics/
+│   ├── 03_Estadistica/
 │   ├── 04_Diagnostico/
 │   └── 05_Figuras_Mapas/
 │
