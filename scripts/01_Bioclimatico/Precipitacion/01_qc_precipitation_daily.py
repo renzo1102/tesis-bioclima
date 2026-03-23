@@ -1,250 +1,294 @@
-# ==========================================================
-# CONTROL DE CALIDAD DE PRECIPITACIÓN DIARIA
-# FIGURAS FINAL – ESTILO PUBLICACIÓN CIENTÍFICA (APA)
-# ==========================================================
+# =====================================================
+# SCRIPT 5
+# Análisis estadístico de NDVI
+# Tendencias, correlación y agregación temporal
+# =====================================================
+
+# =====================================================
+# DESCRIPCIÓN GENERAL
+# =====================================================
+# Este script realiza el análisis estadístico de las series NDVI
+# previamente interpoladas (Script 4).
+#
+# Objetivos:
+# - Evaluar tendencias temporales (regresión lineal)
+# - Aplicar test no paramétrico de Mann-Kendall
+# - Analizar correlación entre cuencas
+# - Generar visualizaciones multipanel
+# - Calcular promedios anuales y mensuales
+#
+# Salidas:
+# - Figura multipanel de tendencias y correlación
+# - Tabla de estadísticas de tendencia
+# - Promedios anuales y mensuales
 
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-from pathlib import Path
+from scipy.stats import linregress, pearsonr
+import pymannkendall as mk
+import os
 
-# ----------------------------------------------------------
-# RUTAS
-# ----------------------------------------------------------
-BASE_DIR = Path(__file__).resolve().parents[1]
+# =====================================================
+# CONFIGURACIÓN DE ESTILO
+# =====================================================
+# Se define un formato gráfico consistente con artículos científicos.
 
-DATA_RAW = BASE_DIR / "data" / "raw"
-OUTPUTS = BASE_DIR / "outputs" / "qc_individual"
-TABLAS = OUTPUTS / "tablas"
-FIGURAS = OUTPUTS / "figuras"
-
-TABLAS.mkdir(parents=True, exist_ok=True)
-FIGURAS.mkdir(parents=True, exist_ok=True)
-
-# ----------------------------------------------------------
-# CONFIGURACIÓN GRÁFICA
-# ----------------------------------------------------------
 plt.rcParams.update({
     "font.family": "serif",
-    "font.size": 11
+    "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+    "font.size": 8,
+    "axes.labelsize": 8,
+    "axes.titlesize": 8,
+    "xtick.labelsize": 7,
+    "ytick.labelsize": 7,
+    "legend.fontsize": 7,
+    "axes.linewidth": 0.6,
+    "lines.linewidth": 1.2,
+    "savefig.dpi": 600,
+    "savefig.bbox": "tight"
 })
 
-COLOR_SERIE_ANA = "#238b45"
-COLOR_SERIE_UH  = "#1f78b4"
+# =====================================================
+# DEFINICIÓN DE COLORES
+# =====================================================
 
-COLOR_OK   = "#fdae61"
-COLOR_REV  = "#d73027"
-COLOR_COMP = "#bdbdbd"
+COLOR_MATOC = "#4FA3D9"
+COLOR_POCCO = "#F4A261"
+COLOR_TREND = "#6E6E6E"
+COLOR_CORR_POINTS = "#7A7A7A"
+COLOR_CORR_LINE = "#4D4D4D"
 
-# ----------------------------------------------------------
-# ENSO
-# ----------------------------------------------------------
-ENSO = {
-    2011: "Neutro", 2012: "Niño", 2013: "Niña",
-    2014: "Niño", 2015: "Niño", 2016: "Niño",
-    2017: "Niño", 2018: "Niña", 2019: "Neutro",
-    2020: "Niña", 2021: "Niña", 2022: "Niña",
-    2023: "Niño", 2024: "Niño"
-}
+# =====================================================
+# DIRECTORIOS DE SALIDA
+# =====================================================
 
-# ----------------------------------------------------------
-# FUNCIONES QC
-# ----------------------------------------------------------
-def clasificar_epoca(fecha):
-    return "Lluviosa" if fecha.month in [10,11,12,1,2,3,4] else "Seca"
+os.makedirs("outputs/figuras", exist_ok=True)
+os.makedirs("outputs/estadisticas", exist_ok=True)
 
-def qc_fisico(p):
-    return (p >= 0) & (p <= 300)
+# =====================================================
+# CARGA DE DATOS INTERPOLADOS
+# =====================================================
+# Se utilizan las series continuas generadas previamente.
 
-def qc_iqr_por_epoca(df):
-    df = df.copy()
-    df["Epoca"] = df["fecha"].apply(clasificar_epoca)
-    flag = pd.Series(True, index=df.index)
+matoc = pd.read_csv("outputs/csv/NDVI_MATOC_interpolado.csv")
+pocco = pd.read_csv("outputs/csv/NDVI_POCCO_interpolado.csv")
 
-    for epoca in ["Lluviosa", "Seca"]:
-        sub = df.loc[df["Epoca"] == epoca, "precipitacion_mm"]
-        if sub.count() < 10:
-            continue
-        q1, q3 = sub.quantile([0.25, 0.75])
-        iqr = q3 - q1
-        li, ls = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-        idx = df[df["Epoca"] == epoca].index
-        flag.loc[idx] = df.loc[idx, "precipitacion_mm"].between(li, ls)
+# Construcción de variable temporal
+matoc["Fecha"] = pd.to_datetime(matoc[['Year','Month']].assign(DAY=1))
+pocco["Fecha"] = pd.to_datetime(pocco[['Year','Month']].assign(DAY=1))
 
-    return flag
+# Orden cronológico
+matoc = matoc.sort_values("Fecha")
+pocco = pocco.sort_values("Fecha")
 
-def qc_ceros(series):
-    flag = []
-    for i in range(len(series)):
-        if series.iloc[i] == 0 and 0 < i < len(series)-1:
-            flag.append(not (series.iloc[i-1] > 1 and series.iloc[i+1] > 1))
-        else:
-            flag.append(True)
-    return pd.Series(flag, index=series.index)
+# =====================================================
+# UNIÓN TEMPORAL DE SERIES
+# =====================================================
+# Se combinan ambas series por fecha para análisis conjunto.
 
-def qc_temporal(series):
-    return series.diff().abs() <= series.diff().abs().quantile(0.99)
-
-def qc_enso(df):
-    df = df.copy()
-    df["ENSO"] = df["fecha"].dt.year.map(ENSO)
-    p95 = df["precipitacion_mm"].quantile(0.95)
-    return ~((df["ENSO"] == "Neutro") & (df["precipitacion_mm"] > p95))
-
-# ----------------------------------------------------------
-# QC COMPLETO
-# ----------------------------------------------------------
-def ejecutar_qc(df, uh, estacion):
-
-    df = df.copy()
-    df["fecha"] = pd.to_datetime(df["fecha"])
-    df = df.sort_values("fecha")
-
-    p = df["precipitacion_mm"]
-
-    df["QC_Fisico"] = qc_fisico(p)
-    df["QC_IQR"] = qc_iqr_por_epoca(df)
-    df["QC_Ceros"] = qc_ceros(p)
-    df["QC_Temporal"] = qc_temporal(p)
-    df["QC_ENSO"] = qc_enso(df)
-
-    def decision(r):
-        if not r["QC_Fisico"]:
-            return "Completar"
-        elif not (r["QC_IQR"] and r["QC_Ceros"] and r["QC_Temporal"] and r["QC_ENSO"]):
-            return "Revisar"
-        else:
-            return "Aceptado"
-
-    df["Decision"] = df.apply(decision, axis=1)
-    df["UH"] = uh
-
-    if "ANA" in estacion:
-        if "1" in estacion:
-            estacion = "ANA 1"
-        elif "2" in estacion:
-            estacion = "ANA 2"
-
-    df["Estacion"] = estacion
-    return df
-
-# ----------------------------------------------------------
-# LECTURA Y QC
-# ----------------------------------------------------------
-qc_total = []
-
-for archivo in DATA_RAW.glob("*.xlsx"):
-    uh = archivo.stem.split("_")[0]
-    estacion = archivo.stem
-    df = pd.read_excel(archivo)[["fecha", "precipitacion_mm"]]
-    qc = ejecutar_qc(df, uh, estacion)
-    qc_total.append(qc)
-
-qc_total = pd.concat(qc_total, ignore_index=True)
-
-# ----------------------------------------------------------
-# FUNCIÓN DE PANEL
-# ----------------------------------------------------------
-def panel_series(df, estaciones, titulo, color_linea, nombre):
-
-    n = len(estaciones)
-    fig, axes = plt.subplots(n, 1, figsize=(18, 4*n), sharex=True)
-
-    if n == 1:
-        axes = [axes]
-
-    letras = ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)"]
-
-    for i, (ax, est) in enumerate(zip(axes, estaciones)):
-
-        d = df[df["Estacion"] == est].sort_values("fecha")
-
-        # Línea base
-        ax.plot(d["fecha"], d["precipitacion_mm"],
-                color=color_linea, lw=0.9,
-                alpha=0.6, zorder=1,
-                label="Serie observada")
-
-        # Aceptado
-        a = d[d["Decision"] == "Aceptado"]
-        ax.scatter(a["fecha"], a["precipitacion_mm"],
-                   s=14, color=COLOR_OK,
-                   zorder=4, label="Aceptado")
-
-        # Revisar
-        r = d[d["Decision"] == "Revisar"]
-        ax.scatter(r["fecha"], r["precipitacion_mm"],
-                   s=18, facecolors="none",
-                   edgecolors=COLOR_REV,
-                   linewidth=0.8,
-                   zorder=5, label="Revisar")
-
-        # Completar
-        c = d[d["Decision"] == "Completar"].copy()
-        if not c.empty:
-            c["grupo"] = (c["fecha"].diff().dt.days != 1).cumsum()
-            bloques = c.groupby("grupo").agg(
-                inicio=("fecha", "min"),
-                fin=("fecha", "max")
-            )
-            for _, row in bloques.iterrows():
-                ax.axvspan(row["inicio"], row["fin"],
-                           color=COLOR_COMP,
-                           alpha=0.08,
-                           zorder=0,
-                           label="Completar")
-
-        ax.set_title(f"{letras[i]} {est}", loc="left", fontsize=11)
-        ax.set_ylabel("Precipitación (mm)")
-        ax.grid(True, linestyle="--", alpha=0.25)
-
-        handles, labels = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(),
-                  by_label.keys(),
-                  loc="upper right",
-                  frameon=False,
-                  fontsize=10)
-
-    axes[-1].set_xlabel("Año")
-
-    fig.suptitle(titulo, fontsize=14)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(FIGURAS / nombre, dpi=600, bbox_inches="tight")
-    plt.close()
-
-# ----------------------------------------------------------
-# GENERAR FIGURAS
-# ----------------------------------------------------------
-
-# ANA
-panel_series(
-    qc_total,
-    ["ANA 1", "ANA 2"],
-    "Series de precipitación diaria y control de calidad – Estaciones ANA",
-    COLOR_SERIE_ANA,
-    "Panel_ANA_QC.png"
+merged = pd.merge(
+    matoc[["Fecha","NDVI"]],
+    pocco[["Fecha","NDVI"]],
+    on="Fecha",
+    suffixes=("_Matoc","_Pocco")
 )
 
-# MATOC
-est_matoc = sorted([e for e in qc_total["Estacion"].unique() if "Matoc" in e])
-if est_matoc:
-    panel_series(
-        qc_total,
-        est_matoc,
-        "Series de precipitación diaria y control de calidad – UH Matoc",
-        COLOR_SERIE_UH,
-        "Panel_UH_Matoc_QC.png"
-    )
+# =====================================================
+# ANÁLISIS DE TENDENCIAS
+# =====================================================
 
-# POCCO
-est_pocco = sorted([e for e in qc_total["Estacion"].unique() if "Pocco" in e])
-if est_pocco:
-    panel_series(
-        qc_total,
-        est_pocco,
-        "Series de precipitación diaria y control de calidad – UH Pocco",
-        COLOR_SERIE_UH,
-        "Panel_UH_Pocco_QC.png"
-    )
+# -------------------------
+# Matoc
+# -------------------------
+# Regresión lineal sobre índice temporal
 
-print("Figuras generadas correctamente.")
+x_m = np.arange(len(matoc))
+slope_m, intercept_m, r_m, p_m, _ = linregress(x_m, matoc["NDVI"])
+
+# Test de Mann-Kendall (tendencia no paramétrica)
+mk_m = mk.original_test(matoc["NDVI"])
+
+# -------------------------
+# Pocco
+# -------------------------
+
+x_p = np.arange(len(pocco))
+slope_p, intercept_p, r_p, p_p, _ = linregress(x_p, pocco["NDVI"])
+
+mk_p = mk.original_test(pocco["NDVI"])
+
+# -------------------------
+# Correlación entre cuencas
+# -------------------------
+
+r_c, p_c = pearsonr(
+    merged["NDVI_Matoc"],
+    merged["NDVI_Pocco"]
+)
+
+# =====================================================
+# FIGURA MULTIPANEL
+# =====================================================
+# Se generan cuatro paneles:
+# (a) Serie + tendencia Matoc
+# (b) Serie + tendencia Pocco
+# (c) Comparación temporal
+# (d) Correlación
+
+fig, axs = plt.subplots(2, 2, figsize=(7, 5))
+
+# (a) Matoc
+axs[0,0].plot(matoc["Fecha"], matoc["NDVI"], color=COLOR_MATOC)
+axs[0,0].plot(matoc["Fecha"], intercept_m + slope_m*x_m,
+              linestyle="--", color=COLOR_TREND)
+axs[0,0].set_ylabel("NDVI")
+axs[0,0].set_title("(a) Serie temporal Matoc", loc="left")
+axs[0,0].text(
+    0.02, 0.95,
+    f"R² = {r_m**2:.3f}\np = {p_m:.3f}\nMK: {mk_m.trend}",
+    transform=axs[0,0].transAxes,
+    va="top",
+    bbox=dict(facecolor="white", edgecolor="none")
+)
+
+# (b) Pocco
+axs[0,1].plot(pocco["Fecha"], pocco["NDVI"], color=COLOR_POCCO)
+axs[0,1].plot(pocco["Fecha"], intercept_p + slope_p*x_p,
+              linestyle="--", color=COLOR_TREND)
+axs[0,1].set_title("(b) Serie temporal Pocco", loc="left")
+axs[0,1].text(
+    0.02, 0.95,
+    f"R² = {r_p**2:.3f}\np = {p_p:.3f}\nMK: {mk_p.trend}",
+    transform=axs[0,1].transAxes,
+    va="top",
+    bbox=dict(facecolor="white", edgecolor="none")
+)
+
+# (c) Comparación temporal
+axs[1,0].plot(merged["Fecha"], merged["NDVI_Matoc"],
+              color=COLOR_MATOC, label="Matoc")
+axs[1,0].plot(merged["Fecha"], merged["NDVI_Pocco"],
+              color=COLOR_POCCO, label="Pocco")
+axs[1,0].set_ylabel("NDVI")
+axs[1,0].set_xlabel("Año")
+axs[1,0].set_title("(c) Comparación temporal", loc="left")
+axs[1,0].legend(frameon=False)
+
+# (d) Correlación
+axs[1,1].scatter(
+    merged["NDVI_Matoc"],
+    merged["NDVI_Pocco"],
+    facecolors="none",
+    edgecolors=COLOR_CORR_POINTS,
+    s=22,
+    linewidths=0.8
+)
+
+# Línea de regresión
+x_line = np.linspace(
+    merged["NDVI_Matoc"].min(),
+    merged["NDVI_Matoc"].max(),
+    100
+)
+
+slope_c, intercept_c, _, _, _ = linregress(
+    merged["NDVI_Matoc"],
+    merged["NDVI_Pocco"]
+)
+
+axs[1,1].plot(
+    x_line,
+    intercept_c + slope_c*x_line,
+    linestyle="--",
+    color=COLOR_CORR_LINE,
+    linewidth=1.3
+)
+
+axs[1,1].set_xlabel("Matoc")
+axs[1,1].set_ylabel("Pocco")
+axs[1,1].set_title("(d) Correlación NDVI", loc="left")
+axs[1,1].text(
+    0.02, 0.95,
+    f"r = {r_c:.2f}\np < 0.001",
+    transform=axs[1,1].transAxes,
+    va="top",
+    bbox=dict(facecolor="white", edgecolor="none")
+)
+
+# Ajustes estéticos
+for ax in axs.flat:
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(width=0.6, length=3)
+
+plt.tight_layout()
+plt.savefig("outputs/figuras/Figura_3_Tendencias_NDVI.png")
+plt.close()
+
+# =====================================================
+# EXPORTACIÓN DE TABLAS ESTADÍSTICAS
+# =====================================================
+
+estadisticas = pd.DataFrame({
+    "Serie": ["Matoc", "Pocco", "Correlación"],
+    "Pendiente": [slope_m, slope_p, slope_c],
+    "R2": [r_m**2, r_p**2, r_c**2],
+    "p_valor": [p_m, p_p, p_c],
+    "MannKendall": [mk_m.trend, mk_p.trend, "NA"]
+})
+
+estadisticas.to_csv(
+    "outputs/estadisticas/NDVI_estadisticas_tendencia.csv",
+    index=False
+)
+
+# =====================================================
+# PROMEDIO ANUAL
+# =====================================================
+# Agregación por año
+
+matoc_anual = matoc.groupby("Year")["NDVI"].mean().reset_index()
+matoc_anual["Serie"] = "Matoc"
+
+pocco_anual = pocco.groupby("Year")["NDVI"].mean().reset_index()
+pocco_anual["Serie"] = "Pocco"
+
+prom_anual = pd.concat([matoc_anual, pocco_anual])
+prom_anual.to_csv(
+    "outputs/estadisticas/NDVI_promedio_anual.csv",
+    index=False
+)
+
+# =====================================================
+# PROMEDIO MENSUAL
+# =====================================================
+# Agregación por mes (climatología mensual)
+
+matoc_mensual = matoc.groupby("Month")["NDVI"].mean().reset_index()
+matoc_mensual["Serie"] = "Matoc"
+
+pocco_mensual = pocco.groupby("Month")["NDVI"].mean().reset_index()
+pocco_mensual["Serie"] = "Pocco"
+
+prom_mensual = pd.concat([matoc_mensual, pocco_mensual])
+prom_mensual.to_csv(
+    "outputs/estadisticas/NDVI_promedio_mensual.csv",
+    index=False
+)
+
+print("Script 3 ejecutado correctamente")
+print("Figura exportada")
+print("Tablas estadísticas, mensuales y anuales exportadas")
+
+# =====================================================
+# SALIDAS DEL SCRIPT
+# =====================================================
+# - Figura: outputs/figuras/Figura_3_Tendencias_NDVI.png
+# - Estadísticas: NDVI_estadisticas_tendencia.csv
+# - Promedio anual: NDVI_promedio_anual.csv
+# - Promedio mensual: NDVI_promedio_mensual.csv
+#
+# Este script permite interpretar la dinámica temporal del NDVI
+# y su coherencia entre unidades hidrográficas.
+# =====================================================
