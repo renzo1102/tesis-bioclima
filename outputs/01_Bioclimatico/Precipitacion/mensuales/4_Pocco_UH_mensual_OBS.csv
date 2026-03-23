@@ -1,0 +1,133 @@
+fecha_mensual,Prec_UH_OBS,n_estaciones_validas,Fuente,UH
+2012-01-01,189.5,2,Promedio >=2 estaciones,Pocco
+2012-02-01,234.0,2,Promedio >=2 estaciones,Pocco
+2012-03-01,120.39999999999999,2,Promedio >=2 estaciones,Pocco
+2012-04-01,,0,Sin datos,Pocco
+2012-05-01,,0,Sin datos,Pocco
+2012-06-01,6.0,1,1 estación,Pocco
+2012-07-01,2.6,1,1 estación,Pocco
+2012-08-01,2.7,2,Promedio >=2 estaciones,Pocco
+2012-09-01,25.700000000000003,2,Promedio >=2 estaciones,Pocco
+2012-10-01,54.199999999999996,3,Promedio >=2 estaciones,Pocco
+2012-11-01,167.06666666666663,3,Promedio >=2 estaciones,Pocco
+2012-12-01,153.0666666666667,3,Promedio >=2 estaciones,Pocco
+2013-01-01,106.8,3,Promedio >=2 estaciones,Pocco
+2013-02-01,176.5,2,Promedio >=2 estaciones,Pocco
+2013-03-01,374.6,1,1 estación,Pocco
+2013-04-01,75.19999999999999,1,1 estación,Pocco
+2013-05-01,26.733333333333338,3,Promedio >=2 estaciones,Pocco
+2013-06-01,2.2,3,Promedio >=2 estaciones,Pocco
+2013-07-01,2.9333333333333336,3,Promedio >=2 estaciones,Pocco
+2013-08-01,14.933333333333337,3,Promedio >=2 estaciones,Pocco
+2013-09-01,18.933333333333337,3,Promedio >=2 estaciones,Pocco
+2013-10-01,153.0,3,Promedio >=2 estaciones,Pocco
+2013-11-01,130.86666666666667,3,Promedio >=2 estaciones,Pocco
+2013-12-01,167.6,3,Promedio >=2 estaciones,Pocco
+2014-01-01,,0,Sin datos,Pocco
+2014-02-01,,0,Sin datos,Pocco
+2014-03-01,,0,Sin datos,Pocco
+2014-04-01,,0,Sin datos,Pocco
+2014-05-01,,0,Sin datos,Pocco
+2014-06-01,,0,Sin datos,Pocco
+2014-07-01,16.400000000000002,3,Promedio >=2 estaciones,Pocco
+2014-08-01,7.866666666666666,3,Promedio >=2 estaciones,Pocco
+2014-09-01,52.93333333333334,3,Promedio >=2 estaciones,Pocco
+2014-10-01,94.93333333333332,3,Promedio >=2 estaciones,Pocco
+2014-11-01,132.0,3,Promedio >=2 estaciones,Pocco
+2014-12-01,206.33333333333334,3,Promedio >=2 estaciones,Pocco
+2015-01-01,245.26666666666665,3,Promedio >=2 estaciones,Pocco
+2015-02-01,72.80000000000001,2,Promedio >=2 estaciones,Pocco
+2015-03-01,234.5,2,Promedio >=2 estaciones,Pocco
+2015-04-01,98.0,2,Promedio >=2 estaciones,Pocco
+2015-05-01,141.2,2,Promedio >=2 estaciones,Pocco
+2015-06-01,16.1,2,Promedio >=2 estaciones,Pocco
+2015-07-01,3.4,1,1 estación,Pocco
+2015-08-01,25.6,1,1 estación,Pocco
+2015-09-01,37.00000000000001,1,1 estación,Pocco
+2015-10-01,103.6,1,1 estación,Pocco
+2015-11-01,172.20000000000002,1,1 estación,Pocco
+2015-12-01,106.8,1,1 estación,Pocco
+2016-01-01,114.0,1,1 estación,Pocco
+2016-02-01,206.4,1,1 estación,Pocco
+2016-03-01,143.3,2,Promedio >=2 estaciones,Pocco
+2016-04-01,104.4,2,Promedio >=2 estaciones,Pocco
+2016-05-01,19.4,2,Promedio >=2 estaciones,Pocco
+2016-06-01,9.100000000000001,2,Promedio >=2 estaciones,Pocco
+2016-07-01,1.4000000000000004,2,Promedio >=2 estaciones,Pocco
+2016-08-01,6.500000000000002,2,Promedio >=2 estaciones,Pocco
+2016-09-01,,0,Sin datos,Pocco
+2016-10-01,,0,Sin datos,Pocco
+2016-11-01,,0,Sin datos,Pocco
+2016-12-01,,0,Sin datos,Pocco
+2017-01-01,,0,Sin datos,Pocco
+2017-02-01,,0,Sin datos,Pocco
+2017-03-01,,0,Sin datos,Pocco
+2017-04-01,,0,Sin datos,Pocco
+2017-05-01,,0,Sin datos,Pocco
+2017-06-01,,0,Sin datos,Pocco
+2017-07-01,,0,Sin datos,Pocco
+2017-08-01,,0,Sin datos,Pocco
+2017-09-01,,0,Sin datos,Pocco
+2017-10-01,,0,Sin datos,Pocco
+2017-11-01,,0,Sin datos,Pocco
+2017-12-01,,0,Sin datos,Pocco
+2018-01-01,,0,Sin datos,Pocco
+2018-02-01,155.8,2,Promedio >=2 estaciones,Pocco
+2018-03-01,303.5,2,Promedio >=2 estaciones,Pocco
+2018-04-01,110.19999999999996,1,1 estación,Pocco
+2018-05-01,61.4,1,1 estación,Pocco
+2018-06-01,12.9,2,Promedio >=2 estaciones,Pocco
+2018-07-01,9.399999999999999,2,Promedio >=2 estaciones,Pocco
+2018-08-01,5.6000000000000005,2,Promedio >=2 estaciones,Pocco
+2018-09-01,28.0,2,Promedio >=2 estaciones,Pocco
+2018-10-01,,0,Sin datos,Pocco
+2018-11-01,,0,Sin datos,Pocco
+2018-12-01,,0,Sin datos,Pocco
+2019-01-01,,0,Sin datos,Pocco
+2019-02-01,,0,Sin datos,Pocco
+2019-03-01,,0,Sin datos,Pocco
+2019-04-01,,0,Sin datos,Pocco
+2019-05-01,,0,Sin datos,Pocco
+2019-06-01,,0,Sin datos,Pocco
+2019-07-01,,0,Sin datos,Pocco
+2019-08-01,,0,Sin datos,Pocco
+2019-09-01,,0,Sin datos,Pocco
+2019-10-01,,0,Sin datos,Pocco
+2019-11-01,,0,Sin datos,Pocco
+2019-12-01,,0,Sin datos,Pocco
+2020-01-01,,0,Sin datos,Pocco
+2020-02-01,,0,Sin datos,Pocco
+2020-03-01,,0,Sin datos,Pocco
+2020-04-01,,0,Sin datos,Pocco
+2020-05-01,,0,Sin datos,Pocco
+2020-06-01,,0,Sin datos,Pocco
+2020-07-01,,0,Sin datos,Pocco
+2020-08-01,,0,Sin datos,Pocco
+2020-09-01,,0,Sin datos,Pocco
+2020-10-01,,0,Sin datos,Pocco
+2020-11-01,,0,Sin datos,Pocco
+2020-12-01,,0,Sin datos,Pocco
+2021-01-01,,0,Sin datos,Pocco
+2021-02-01,,0,Sin datos,Pocco
+2021-03-01,,0,Sin datos,Pocco
+2021-04-01,,0,Sin datos,Pocco
+2021-05-01,,0,Sin datos,Pocco
+2021-06-01,,0,Sin datos,Pocco
+2021-07-01,,0,Sin datos,Pocco
+2021-08-01,,0,Sin datos,Pocco
+2021-09-01,,0,Sin datos,Pocco
+2021-10-01,,0,Sin datos,Pocco
+2021-11-01,,0,Sin datos,Pocco
+2021-12-01,,0,Sin datos,Pocco
+2022-01-01,,0,Sin datos,Pocco
+2022-02-01,,0,Sin datos,Pocco
+2022-03-01,,0,Sin datos,Pocco
+2022-04-01,,0,Sin datos,Pocco
+2022-05-01,,0,Sin datos,Pocco
+2022-06-01,23.8,2,Promedio >=2 estaciones,Pocco
+2022-07-01,6.000000000000001,2,Promedio >=2 estaciones,Pocco
+2022-08-01,13.3,2,Promedio >=2 estaciones,Pocco
+2022-09-01,71.6,2,Promedio >=2 estaciones,Pocco
+2022-10-01,79.19999999999999,2,Promedio >=2 estaciones,Pocco
+2022-11-01,,0,Sin datos,Pocco
+2022-12-01,,0,Sin datos,Pocco

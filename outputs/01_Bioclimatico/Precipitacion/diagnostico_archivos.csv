@@ -1,0 +1,35 @@
+archivo,carpeta,n_columnas,columnas,tiene_chirps,tiene_corr,tiene_obs_ana,tiene_metricas
+5_metricas_regionales.csv,analisis_regional,8,"UH, Predictor, R, R2, RMSE, Bias, NSE, n_meses",False,False,False,True
+CHIRPS_ANA1_2012_2022.csv,chirps,4,"system:index, CHIRPS, date, .geo",True,False,False,False
+CHIRPS_ANA2_2012_2022.csv,chirps,4,"system:index, CHIRPS, date, .geo",True,False,False,False
+CHIRPS_MATOC_2012_2022.csv,chirps,4,"system:index, CHIRPS, date, .geo",True,False,False,False
+CHIRPS_POCCO_2012_2022.csv,chirps,4,"system:index, CHIRPS, date, .geo",True,False,False,False
+CHIRPS_ANA1_corregido.csv,chirps_corregido,8,"system:index, CHIRPS_ANA1, date, .geo, fecha_mensual, mes, Factor_correccion, CHIRPS_ANA1_CORR",True,True,True,False
+CHIRPS_MATOC_corregido.csv,chirps_corregido,8,"system:index, CHIRPS_MATOC, date, .geo, fecha_mensual, mes, Factor_correccion, CHIRPS_MATOC_CORR",True,True,False,False
+CHIRPS_POCCO_corregido.csv,chirps_corregido,8,"system:index, CHIRPS_POCCO, date, .geo, fecha_mensual, mes, Factor_correccion, CHIRPS_POCCO_CORR",True,True,False,False
+factores_mensuales_base_ANA1.csv,chirps_corregido,2,"mes, Factor_correccion",False,True,False,False
+metricas_post_correccion_ANA1.csv,chirps_corregido,7,"R, R2, RMSE, Bias_mm, Bias_%, NSE, n_meses",False,False,False,True
+resumen_anual_fase1.csv,diagnosticos,3,"Estacion, anio, %_datos_validos",False,False,False,False
+resumen_estaciones_fase1.csv,diagnosticos,6,"Estacion, total_registros, validos, na, %_NA, %_validos",False,False,False,False
+4_Matoc_UH_mensual_OBS.csv,mensuales,5,"fecha_mensual, Prec_UH_OBS, n_estaciones_validas, Fuente, UH",False,False,True,False
+4_Pocco_UH_mensual_OBS.csv,mensuales,5,"fecha_mensual, Prec_UH_OBS, n_estaciones_validas, Fuente, UH",False,False,True,False
+4_resumen_UH_mensual_OBS.csv,mensuales,8,"UH, meses_totales, meses_validos, meses_na, porcentaje_cobertura, meses_promedio_>=2_est, meses_1_estacion, meses_sin_datos",False,False,False,False
+mensual_estaciones_2012_2022.csv,mensuales,9,"UH, Estacion, anio, mes, Prec_mensual, Dias_totales, Dias_validos, Porcentaje_validos, fecha_mensual",False,False,False,False
+resumen_disponibilidad_mensual.csv,mensuales,6,"UH, Estacion, meses_totales, meses_validos, meses_na, porcentaje_meses_validos",False,False,False,False
+diario_post_qc_fase1.csv,post_qc,11,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion, Precip_postQC",False,False,False,False
+QC_individual_ANA_1_Uru.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_ANA_2_Yana.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Matoc_1.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Matoc_2.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Matoc_3.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Pocco_1.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Pocco_2.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_individual_Pocco_3.csv,tablas,10,"fecha, precipitacion_mm, QC_Fisico, QC_IQR, QC_Ceros, QC_Temporal, QC_ENSO, Decision, UH, Estacion",False,False,False,False
+QC_resumen_general.csv,tablas,9,"UH, Estacion, Aceptado_n, Completar_n, Revisar_n, Total_dias, Aceptado_%, Revisar_%, Completar_%",False,False,False,False
+ecuaciones_regresion_ANA1.csv,serie_final,5,"UH, Intercepto_a, Pendiente_b, R2_modelo, RMSE_modelo",False,False,False,False
+Matoc_serie_mensual_2012_2022_completa.csv,serie_final,8,"fecha_mensual, Prec_UH_OBS, n_estaciones_validas, Fuente, UH, ANA1, CHIRPS_MATOC_CORR, Precip_final",True,True,True,False
+Pocco_serie_mensual_2012_2022_completa.csv,serie_final,8,"fecha_mensual, Prec_UH_OBS, n_estaciones_validas, Fuente, UH, ANA1, CHIRPS_POCCO_CORR, Precip_final",True,True,True,False
+resumen_fuentes_completacion.csv,serie_final,4,"UH, Fuente, Meses, Porcentaje_%",False,False,False,False
+7_fase5_validacion_chirps_integral.csv,validacion_chirps,8,"Serie, R, R2, RMSE, Bias_mm, Bias_%, NSE, n_meses",False,False,False,True
+resultados_iteraciones_validacion_cruzada.csv,validacion_cruzada,8,"UH, Iteracion, R, R2, RMSE, MAE, Bias_%, NSE",False,False,False,True
+resumen_promedio_validacion_cruzada.csv,validacion_cruzada,8,"UH, Iteracion, R, R2, RMSE, MAE, Bias_%, NSE",False,False,False,True
