@@ -42,19 +42,19 @@ Periodo de análisis: 2012 – 2022.
 ## Estructura del repositorio
 
 ```
-tesis-bioclimatica/
+tesis-bioclima/
 │
 ├── README.md
 ├── requirements.txt
 ├── scripts/
-│   ├── 01_Bioclimatic/
+│   ├── 01_Bioclimatico/
 │   │   ├── NDVI/
-│   │   ├── Precipitation/
-│   │   └── Temperature/
+│   │   ├── Precipitacion/
+│   │   └── Temperatura/
 │   │
-│   ├── 02_Hydrology/
-│   ├── 03_Statistics/
-│   ├── 04_Diagnostics/
+│   ├── 02_Hidrologia/
+│   ├── 03_Estadistics/
+│   ├── 04_Diagnostico/
 │   └── 05_Figuras_Mapas/
 │
 ├── outputs/
