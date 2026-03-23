@@ -14,7 +14,7 @@
 # - Landsat 7 (2012)
 # - Landsat 8 (2013–2020)
 # - Landsat 9 (2021–2022)
-# - Sentinel-2 Harmonized (2017–2022)
+# - Sentinel-2 Harmonized (2019–2022)
 #
 # El objetivo es generar una serie temporal consistente de NDVI
 # para análisis ecohidrológico, permitiendo:
@@ -206,7 +206,7 @@ L9 = (
 
 
 # -----------------------------------------------------
-# SENTINEL-2 (2017–2022)
+# SENTINEL-2 (2019–2022)
 # -----------------------------------------------------
 # Se añade un filtro adicional:
 # - CLOUDY_PIXEL_PERCENTAGE < 40
@@ -217,7 +217,7 @@ L9 = (
 
 S2 = (
     ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-    .filterDate("2017-01-01", "2022-12-31")
+    .filterDate("2019-01-01", "2022-12-31")
     .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 40))
     .map(add_ndvi_s2)
 )
