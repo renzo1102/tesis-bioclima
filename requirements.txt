@@ -1,0 +1,84 @@
+# ==========================================================
+# REQUIREMENTS.TXT - TESIS - RENZO MENDOZA
+# ==========================================================
+# Compatible con Python 3.9 – 3.11
+# ==========================================================
+
+# =========================
+# CORE CIENTÍFICO
+# =========================
+numpy>=1.23
+pandas>=1.5
+scipy>=1.10
+xarray>=2023.1
+
+# =========================
+# ANÁLISIS ESTADÍSTICO / ML
+# =========================
+statsmodels>=0.14
+scikit-learn>=1.3
+pymannkendall>=1.4
+
+# =========================
+# VISUALIZACIÓN
+# =========================
+matplotlib>=3.7
+seaborn>=0.12
+
+# =========================
+# GIS / TELEDETECCIÓN LOCAL
+# =========================
+geopandas>=0.13
+rasterio>=1.3
+shapely>=2.0
+fiona>=1.9
+pyproj>=3.6
+
+# =========================
+# GOOGLE EARTH ENGINE
+# =========================
+earthengine-api>=0.1.390
+geemap>=0.30
+
+# =========================
+# FORMATOS Y DATOS
+# =========================
+netCDF4>=1.6
+h5netcdf>=1.2
+openpyxl>=3.1
+
+# =========================
+# UTILIDADES
+# =========================
+tqdm>=4.66
+joblib>=1.3
+python-dotenv>=1.0
+
+# =========================
+# COMPATIBILIDAD / SOPORTE
+# =========================
+packaging>=23.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+# =========================
+# OPCIONAL (MEJORA RENDIMIENTO / DEBUG)
+# =========================
+numba>=0.57
+ipython>=8.0
+jupyterlab>=4.0
+
+# =========================
+# NOTAS IMPORTANTES
+# =========================
+# 1. Ejecutar autenticación de Google Earth Engine:
+#    earthengine authenticate
+#
+# 2. En Windows, si geopandas/rasterio fallan:
+#    usar conda:
+#    conda install geopandas rasterio
+#
+# 3. Para reproducibilidad exacta:
+#    pip freeze > requirements_lock.txt
+#
+# ==========================================================
