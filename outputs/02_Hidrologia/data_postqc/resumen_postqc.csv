@@ -1,3 +1,0 @@
-archivo,periodo_estudio_dias,periodo_observado_dias,datos_validos,faltantes_periodo_estudio,pct_completitud_observada,pct_faltantes_periodo_estudio,calidad_estacion
-Q_Matoc_diario_m3s_qc.csv,4018,1418,1380,2638,97.32,65.65,EXCELENTE
-Q_Pocco_diario_m3s_qc.csv,4018,1438,1411,2607,98.12,64.88,EXCELENTE

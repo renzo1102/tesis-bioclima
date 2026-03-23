@@ -1,7 +1,0 @@
-variable;meses_validos;meses_totales;meses_vacios;porcentaje;calidad
-Q_matoc;43;132;89;32.58;Deficiente
-Q_pocco;45;132;87;34.09;Deficiente
-T_matoc;132;132;0;100;Excelente
-T_pocco;132;132;0;100;Excelente
-P_matoc;132;132;0;100;Excelente
-P_pocco;132;132;0;100;Excelente
