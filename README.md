@@ -46,11 +46,6 @@ tesis-bioclimatica/
 │
 ├── README.md
 ├── requirements.txt
-│
-├── data/
-│   ├── raw/
-│   └── processed/
-│
 ├── scripts/
 │   ├── 01_Bioclimatic/
 │   │   ├── NDVI/
@@ -63,7 +58,6 @@ tesis-bioclimatica/
 │   └── 05_Figuras_Mapas/
 │
 ├── outputs/
-│   ├── series/
 │   ├── figures/
 │   └── tables/
 │
