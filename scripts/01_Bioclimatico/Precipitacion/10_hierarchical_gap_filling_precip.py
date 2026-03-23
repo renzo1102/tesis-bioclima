@@ -1,6 +1,52 @@
 # ============================================================
 # FASE 7 — COMPLETACIÓN JERÁRQUICA 2012–2022 (VERSIÓN FINAL)
 # ============================================================
+"""
+DESCRIPCIÓN GENERAL
+------------------------------------------------------------
+Este script implementa la fase final de reconstrucción de las
+series mensuales de precipitación a nivel de unidad hidrológica (UH),
+integrando múltiples fuentes de información bajo un enfoque jerárquico.
+
+El objetivo es obtener una serie continua (sin vacíos) para el periodo
+2012–2022, combinando:
+
+1. Datos observados (máxima confiabilidad)
+2. Estación de referencia regional (ANA 1) mediante regresión
+3. Datos satelitales corregidos (CHIRPS)
+
+El proceso sigue una lógica jerárquica:
+    OBSERVADO > REGRESIÓN ANA 1 > CHIRPS CORREGIDO
+
+Esto permite maximizar la calidad de los datos y minimizar la
+incertidumbre en la reconstrucción temporal.
+
+------------------------------------------------------------
+FLUJO METODOLÓGICO
+------------------------------------------------------------
+1. Cargar series observadas por UH (FASE 3)
+2. Cargar estación de referencia (ANA 1)
+3. Cargar CHIRPS corregido (FASE 6)
+4. Ajustar modelos de regresión UH vs ANA 1
+5. Generar serie temporal completa (2012–2022)
+6. Completar valores faltantes jerárquicamente
+7. Exportar series finales y resumen de fuentes
+
+------------------------------------------------------------
+SUPUESTOS CLAVE
+------------------------------------------------------------
+- ANA 1 es representativa a escala regional
+- La relación UH–ANA 1 es aproximadamente lineal
+- CHIRPS corregido es consistente en ausencia de datos observados
+- No se permiten valores negativos de precipitación
+
+------------------------------------------------------------
+SALIDAS
+------------------------------------------------------------
+- Series completas por UH
+- Ecuaciones de regresión
+- Resumen de fuentes de datos utilizadas
+"""
 
 import pandas as pd
 import numpy as np
@@ -9,7 +55,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 
 # ============================================================
-# RUTAS
+# RUTAS RELATIVAS (PORTABLES)
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,8 +66,18 @@ OUTPUT_DIR = BASE_DIR / "outputs/serie_final"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================
-# CARGAR DATOS
+# CARGA DE DATOS
 # ============================================================
+
+"""
+Se cargan tres tipos de datos:
+
+1. Series observadas por UH (sin relleno)
+2. Serie de estación regional ANA 1
+3. Series CHIRPS previamente corregidas
+
+Todas las series están en resolución mensual.
+"""
 
 matoc_obs = pd.read_csv(
     INPUT_MENSUALES / "4_Matoc_UH_mensual_OBS.csv",
@@ -38,12 +94,14 @@ estaciones = pd.read_csv(
     parse_dates=["fecha_mensual"]
 )
 
+# Extraer ANA 1 como predictor regional
 ana1 = estaciones[
     estaciones["Estacion"] == "ANA 1"
 ][["fecha_mensual", "Prec_mensual"]].rename(
     columns={"Prec_mensual": "ANA1"}
 )
 
+# Cargar CHIRPS corregido
 matoc_ch = pd.read_csv(
     INPUT_CHIRPS_CORR / "CHIRPS_MATOC_corregido.csv",
     parse_dates=["fecha_mensual"]
@@ -55,10 +113,29 @@ pocco_ch = pd.read_csv(
 )
 
 # ============================================================
-# FUNCIÓN AJUSTE REGRESIÓN
+# FUNCIÓN: AJUSTE DE REGRESIÓN LINEAL
 # ============================================================
 
 def ajustar_regresion(df_uh, ana1_df, nombre_uh):
+    """
+    Ajusta un modelo de regresión lineal simple entre la precipitación
+    observada de la UH y la estación ANA 1.
+
+    Modelo:
+        UH = a + b * ANA1
+
+    Parámetros:
+        df_uh   : DataFrame con datos observados de la UH
+        ana1_df : DataFrame con datos de ANA 1
+        nombre_uh : Nombre de la unidad hidrológica
+
+    Retorna:
+        modelo, coeficientes y métricas de ajuste
+
+    Métricas:
+        - R²   : capacidad explicativa
+        - RMSE : error medio
+    """
 
     df = df_uh.merge(ana1_df, on="fecha_mensual", how="inner")
     df = df.dropna()
@@ -84,7 +161,7 @@ def ajustar_regresion(df_uh, ana1_df, nombre_uh):
     return modelo, a, b, r2, rmse
 
 # ============================================================
-# AJUSTAR MODELOS
+# AJUSTE DE MODELOS
 # ============================================================
 
 modelo_matoc, a_matoc, b_matoc, r2_matoc, rmse_matoc = ajustar_regresion(
@@ -98,6 +175,11 @@ modelo_pocco, a_pocco, b_pocco, r2_pocco, rmse_pocco = ajustar_regresion(
 # ============================================================
 # GUARDAR ECUACIONES
 # ============================================================
+
+"""
+Se almacenan los parámetros de regresión para trazabilidad
+y reproducibilidad del modelo.
+"""
 
 ecuaciones_df = pd.DataFrame([
     {
@@ -122,17 +204,41 @@ ecuaciones_df.to_csv(
 )
 
 # ============================================================
-# BASE COMPLETA
+# BASE TEMPORAL COMPLETA
 # ============================================================
+
+"""
+Se genera una serie continua mensual para todo el periodo,
+independientemente de la disponibilidad de datos.
+"""
 
 fechas = pd.date_range("2012-01-01", "2022-12-01", freq="MS")
 base = pd.DataFrame({"fecha_mensual": fechas})
 
 # ============================================================
-# FUNCIÓN COMPLETACIÓN
+# FUNCIÓN: COMPLETACIÓN JERÁRQUICA
 # ============================================================
 
 def completar_serie(base, uh_obs, ana1_df, chirps_df, modelo, nombre_col):
+    """
+    Completa la serie mensual utilizando un esquema jerárquico:
+
+    Prioridad:
+        1. Observado (OBS)
+        2. Regresión con ANA 1 (REG_ANA1)
+        3. CHIRPS corregido (CHIRPS_CORR)
+
+    Parámetros:
+        base        : calendario completo
+        uh_obs      : datos observados UH
+        ana1_df     : estación regional
+        chirps_df   : datos satelitales corregidos
+        modelo      : modelo de regresión
+        nombre_col  : nombre de columna CHIRPS
+
+    Retorna:
+        DataFrame con serie completa y fuente de datos
+    """
 
     df = base.merge(uh_obs, on="fecha_mensual", how="left")
     df = df.merge(ana1_df, on="fecha_mensual", how="left")
@@ -147,15 +253,18 @@ def completar_serie(base, uh_obs, ana1_df, chirps_df, modelo, nombre_col):
 
     for _, row in df.iterrows():
 
+        # 1. Observado
         if not pd.isna(row["Prec_UH_OBS"]):
             valores.append(row["Prec_UH_OBS"])
             fuentes.append("OBS")
 
+        # 2. Regresión
         elif not pd.isna(row["ANA1"]):
             pred = modelo.predict([[row["ANA1"]]])[0]
-            valores.append(max(pred, 0))
+            valores.append(max(pred, 0))  # evitar negativos
             fuentes.append("REG_ANA1")
 
+        # 3. CHIRPS corregido
         else:
             valores.append(row[f"{nombre_col}_CORR"])
             fuentes.append("CHIRPS_CORR")
@@ -166,7 +275,7 @@ def completar_serie(base, uh_obs, ana1_df, chirps_df, modelo, nombre_col):
     return df
 
 # ============================================================
-# COMPLETAR
+# COMPLETAR SERIES
 # ============================================================
 
 matoc_final = completar_serie(
@@ -178,7 +287,7 @@ pocco_final = completar_serie(
 )
 
 # ============================================================
-# GUARDAR SERIES
+# GUARDAR RESULTADOS
 # ============================================================
 
 matoc_final.to_csv(
@@ -196,6 +305,14 @@ pocco_final.to_csv(
 # ============================================================
 
 def guardar_resumen_fuentes(df, nombre):
+    """
+    Calcula la proporción de datos provenientes de cada fuente.
+
+    Permite evaluar:
+    - Dependencia de datos observados
+    - Uso de regresión
+    - Uso de CHIRPS
+    """
 
     resumen = df["Fuente"].value_counts()
     total = len(df)
@@ -219,5 +336,11 @@ resumen_total.to_csv(
     index=False
 )
 
+# ============================================================
+# MENSAJES FINALES
+# ============================================================
+
 print("\nFASE 7 COMPLETADA.")
-print("Archivos generados en outputs/serie_final/")
+print("Series mensuales completas generadas.")
+print("Resumen de fuentes disponible.")
+print("Archivos en: outputs/serie_final/")
